@@ -1,0 +1,3 @@
+[submodule "camerademo/csc"]
+	path = camerademo/csc
+	url = https://github.com/KenthJohan/csc
