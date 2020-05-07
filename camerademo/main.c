@@ -142,7 +142,6 @@ int main (int argc, char * argv[])
 	struct Camera camera;
 	camera_init (&camera, window);
 
-
 	const Uint8 * keyboard = SDL_GetKeyboardState (NULL);
 
 	while (main_flags & MAIN_RUNNING)
@@ -168,6 +167,7 @@ int main (int argc, char * argv[])
 					{
 						SDL_SetWindowFullscreen (window, SDL_WINDOW_OPENGL);
 					}
+					sdl_update_projection (window, camera.mp);
 					break;
 
 				default:
@@ -183,7 +183,7 @@ int main (int argc, char * argv[])
 		camera_update (&camera, keyboard);
 		glUniformMatrix4fv (uniform_mvp, 1, GL_FALSE, (const GLfloat *) (camera.mvp));
 
-		glViewport (0, 0, WIN_W, WIN_H);
+
 		glClearColor (0.1f, 0.1f, 0.1f, 0.0f);
 		glClear (GL_COLOR_BUFFER_BIT);
 
