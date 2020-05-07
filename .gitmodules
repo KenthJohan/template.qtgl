@@ -1,3 +1,6 @@
 [submodule "camerademo/csc"]
 	path = camerademo/csc
 	url = https://github.com/KenthJohan/csc
+[submodule "shape/csc"]
+	path = shape/csc
+	url = https://github.com/KenthJohan/csc
