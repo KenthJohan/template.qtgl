@@ -8,6 +8,7 @@
 #include "csc/csc_lin.h"
 #include "csc/csc_sdlcam.h"
 #include "csc/csc_gl.h"
+#include "csc/csc_vector4.h"
 
 #include "shaper.h"
 
@@ -57,7 +58,7 @@ int main (int argc, char * argv[])
 	glLinkProgram (shader_program);
 	glUseProgram (shader_program);
 
-	glDisable (GL_DEPTH_TEST);
+	glEnable (GL_DEPTH_TEST);
 
 	GLuint vao;
 	GLuint vbo[2];
@@ -97,16 +98,19 @@ int main (int argc, char * argv[])
 
 	struct shaper vertex_pos1;
 	vertex_pos1.last = 0;
-	vertex_pos1.capacity = 2;
+	vertex_pos1.capacity = 12;
 	vertex_pos1.mode = GL_TRIANGLES;
 	shaper_init (&vertex_pos1);
-	shaper_add_square (&vertex_pos1);
-	shaper_add_square (&vertex_pos1);
-
+	shaper_add_square (&vertex_pos1, NULL);
+	struct shape_square sq;
+	v4f32_set_xyzw (sq.p, 0.0f, 0.0f, 0.0f, 0.0f);
+	v4f32_set_xyzw (sq.q, 0.0f, 0.0f, 0.0f, 1.0f);
+	//qf32_xyza (sq.q, 0.0f, 1.0f, 0.0f, 1.0f);
+	shape_square_make (&sq, vertex_pos1.memory);
 
 
 	glBindBuffer (GL_ARRAY_BUFFER, vbo[main_glattr_pos]);
-	glBufferData (GL_ARRAY_BUFFER, sizeof(vertex_pos), vertex_pos1.memory, GL_STATIC_DRAW);
+	glBufferData (GL_ARRAY_BUFFER, vertex_pos1.capacity * sizeof(float) * 3, vertex_pos1.memory, GL_STATIC_DRAW);
 
 	glBindBuffer (GL_ARRAY_BUFFER, vbo[main_glattr_col]);
 	glBufferData (GL_ARRAY_BUFFER, sizeof(vertex_col), vertex_col, GL_STATIC_DRAW);
@@ -156,15 +160,34 @@ int main (int argc, char * argv[])
 			}
 		}
 
+		float r[3];
+		float q[4];
+		r[0] = keyboard [SDL_SCANCODE_KP_1];
+		r[1] = keyboard [SDL_SCANCODE_KP_2];
+		r[2] = keyboard [SDL_SCANCODE_KP_3];
+		qf32_axis_angle (q, r, 0.1f);
+		qf32_mul (sq.q, sq.q, q);
+		qf32_normalize (sq.q, sq.q);
+
+
+		if (vf32_sum (3, r))
+		{
+			v4f32_set_xyzw (sq.p, 0.0f, 0.0f, 0.0f, 0.0f);
+			shape_square_make (&sq, vertex_pos1.memory);
+			glBindBuffer (GL_ARRAY_BUFFER, vbo[main_glattr_pos]);
+			glBufferSubData (GL_ARRAY_BUFFER, 0, vertex_pos1.capacity * sizeof(float) * 3, vertex_pos1.memory);
+			//printf ("x %f\n", x);
+		}
+
 		camera_update (&camera, keyboard);
 		glUniformMatrix4fv (uniform_mvp, 1, GL_FALSE, (const GLfloat *) (camera.mvp));
 
 
 		glClearColor (0.1f, 0.1f, 0.1f, 0.0f);
-		glClear (GL_COLOR_BUFFER_BIT);
+		glClear (GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
 		glBindVertexArray (vao);
-		glDrawArrays (GL_TRIANGLES, 0, 6);
+		glDrawArrays (GL_TRIANGLES, 0, vertex_pos1.last);
 
 		SDL_Delay (10);
 		SDL_GL_SwapWindow (window);
