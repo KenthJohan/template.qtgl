@@ -2,10 +2,7 @@
 
 #include <glad.h>
 #include "csc/csc_debug.h"
-#include "csc/csc_lin.h"
-#include "csc/csc_vector4.h"
-#include "csc/csc_matrix4.h"
-#include "csc/csc_quaternion.h"
+#include "csc/csc_math.h"
 
 
 
@@ -77,7 +74,7 @@ void shaper_add_square (struct shaper * s, float const t[])
 	{
 		for (int i = 0; i < 6*3; i += 3)
 		{
-			lin_vv_add_f32 (square + i, square + i, t, 3);
+			vvf32_add (3, square + i, square + i, t);
 		}
 	}
 	void * memory = s->memory + (s->last * sizeof (float) * 3);

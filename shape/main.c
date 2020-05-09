@@ -5,10 +5,9 @@
 #include "csc/csc_basic.h"
 #include "csc/csc_debug.h"
 #include "csc/csc_malloc_file.h"
-#include "csc/csc_lin.h"
 #include "csc/csc_sdlcam.h"
 #include "csc/csc_gl.h"
-#include "csc/csc_vector4.h"
+#include "csc/csc_math.h"
 
 #include "shaper.h"
 
@@ -51,7 +50,7 @@ int main (int argc, char * argv[])
 	}
 	gladLoadGL();
 
-	char const * shaderfiles[] = {"../camerademo/shader.glvs", "../camerademo/shader.glfs", NULL};
+	char const * shaderfiles[] = {"../shape/shader.glvs", "../shape/shader.glfs", NULL};
 	GLuint shader_program = csc_gl_program_from_files (shaderfiles);
 	glBindAttribLocation (shader_program, main_glattr_pos, "pos" );
 	glBindAttribLocation (shader_program, main_glattr_col, "col" );
@@ -119,10 +118,11 @@ int main (int argc, char * argv[])
 
 
 
-	struct Camera camera;
-	camera_init (&camera, window);
+	struct csc_sdlcam cam;
+	csc_sdlcam_init (&cam);
 
 	const Uint8 * keyboard = SDL_GetKeyboardState (NULL);
+
 
 	while (main_flags & MAIN_RUNNING)
 	{
@@ -147,7 +147,15 @@ int main (int argc, char * argv[])
 					{
 						SDL_SetWindowFullscreen (window, SDL_WINDOW_OPENGL);
 					}
-					sdl_update_projection (window, camera.mp);
+					if(1)
+					{
+						int w;
+						int h;
+						SDL_GetWindowSize (window, &w, &h);
+						cam.w = w;
+						cam.h = h;
+						glViewport (0, 0, w, h);
+					}
 					break;
 
 				default:
@@ -179,9 +187,21 @@ int main (int argc, char * argv[])
 			//printf ("x %f\n", x);
 		}
 
-		camera_update (&camera, keyboard);
-		glUniformMatrix4fv (uniform_mvp, 1, GL_FALSE, (const GLfloat *) (camera.mvp));
+		//camera_update (&camera, keyboard);
+		//glUniformMatrix4fv (uniform_mvp, 1, GL_FALSE, (const GLfloat *) (camera.mvp));
 
+
+		cam.d [0] = 0.1f*(keyboard [SDL_SCANCODE_A] - keyboard [SDL_SCANCODE_D]);
+		cam.d [1] = 0.1f*(keyboard [SDL_SCANCODE_LCTRL] - keyboard [SDL_SCANCODE_SPACE]);
+		cam.d [2] = 0.1f*(keyboard [SDL_SCANCODE_W] - keyboard [SDL_SCANCODE_S]);
+		cam.d [3] = 0;
+
+		cam.pitch += 0.01f * (keyboard [SDL_SCANCODE_DOWN] - keyboard [SDL_SCANCODE_UP]);
+		cam.yaw += 0.01f * (keyboard [SDL_SCANCODE_RIGHT] - keyboard [SDL_SCANCODE_LEFT]);
+
+		float mvp[4*4];
+		csc_sdlcam_build_matrix (&cam, mvp);
+		glUniformMatrix4fv (uniform_mvp, 1, GL_FALSE, (const GLfloat *) mvp);
 
 		glClearColor (0.1f, 0.1f, 0.1f, 0.0f);
 		glClear (GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);

@@ -9,6 +9,8 @@ SOURCES += glad.c
 
 HEADERS += glad.h
 HEADERS += khrplatform.h
+HEADERS += csc/csc_sdlcam.h
+HEADERS += csc/csc_math.h
 INCLUDEPATH += C:\msys64\mingw64\include
 
 
