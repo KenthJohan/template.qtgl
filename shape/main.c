@@ -101,11 +101,16 @@ int main (int argc, char * argv[])
 	vertex_pos1.mode = GL_TRIANGLES;
 	shaper_init (&vertex_pos1);
 	shaper_add_square (&vertex_pos1, NULL);
+	shaper_add_square (&vertex_pos1, NULL);
 	struct shape_square sq;
 	v4f32_set_xyzw (sq.p, 0.0f, 0.0f, 0.0f, 0.0f);
 	v4f32_set_xyzw (sq.q, 0.0f, 0.0f, 0.0f, 1.0f);
 	//qf32_xyza (sq.q, 0.0f, 1.0f, 0.0f, 1.0f);
 	shape_square_make (&sq, vertex_pos1.memory);
+	v4f32_set_xyzw (sq.p, 0.0f, 2.0f, 0.0f, 0.0f);
+	v4f32_set_xyzw (sq.q, 0.0f, 0.0f, 0.0f, 1.0f);
+	//qf32_xyza (sq.q, 0.0f, 1.0f, 0.0f, 1.0f);
+	shape_square_make (&sq, vertex_pos1.memory + (sizeof(float)*3*6));
 
 
 	glBindBuffer (GL_ARRAY_BUFFER, vbo[main_glattr_pos]);

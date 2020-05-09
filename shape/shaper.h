@@ -39,6 +39,12 @@ void shape_square_make(struct shape_square * square, float v[])
 	qf32_rotate_vector1 (square->q, s+3*3);
 	qf32_rotate_vector1 (square->q, s+3*4);
 	qf32_rotate_vector1 (square->q, s+3*5);
+	vvf32_add (3, s+3*0, s+3*0, square->p);
+	vvf32_add (3, s+3*1, s+3*1, square->p);
+	vvf32_add (3, s+3*2, s+3*2, square->p);
+	vvf32_add (3, s+3*3, s+3*3, square->p);
+	vvf32_add (3, s+3*4, s+3*4, square->p);
+	vvf32_add (3, s+3*5, s+3*5, square->p);
 	vf32_cpy (3*6, v, s);
 }
 
