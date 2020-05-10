@@ -8,8 +8,8 @@
 #include "csc/csc_sdlcam.h"
 #include "csc/csc_gl.h"
 #include "csc/csc_math.h"
+#include "mesh.h"
 
-#include "shaper.h"
 
 #define WIN_X SDL_WINDOWPOS_UNDEFINED
 #define WIN_Y SDL_WINDOWPOS_UNDEFINED
@@ -20,11 +20,6 @@
 #define MAIN_RUNNING    UINT32_C (0x00000001)
 #define MAIN_FULLSCREEN UINT32_C (0x00000002)
 
-enum main_glattr
-{
-	main_glattr_pos,
-	main_glattr_col
-};
 
 
 
@@ -61,35 +56,16 @@ int main (int argc, char * argv[])
 
 	glEnable (GL_DEPTH_TEST);
 
-	GLuint vao;
-	GLuint vbo;
-	glGenVertexArrays (1, &vao);
-	glGenBuffers (1, &vbo);
-	glBindVertexArray (vao);
-	glEnableVertexAttribArray (main_glattr_pos);
-	glEnableVertexAttribArray (main_glattr_col);
+	struct mesharray marr;
+	mesharray_init (&marr);
 
-	glBindBuffer (GL_ARRAY_BUFFER, vbo);
-	glVertexAttribPointer (main_glattr_pos, 4, GL_FLOAT, GL_FALSE, sizeof (struct vertex), (void*)offsetof (struct vertex, pos));
-
-	glBindBuffer (GL_ARRAY_BUFFER, vbo);
-	glVertexAttribPointer (main_glattr_col, 4, GL_FLOAT, GL_FALSE, sizeof (struct vertex), (void*)offsetof (struct vertex, col));
-
-
-
-	struct vertex_handler vhandler;
-	vhandler.vcapacity = 100;
-	vhandler.scapacity = 10;
-	vertexbatch_init (&vhandler);
-	glBindBuffer (GL_ARRAY_BUFFER, vbo);
-	glBufferData (GL_ARRAY_BUFFER, vhandler.vcapacity * sizeof (struct vertex), NULL, GL_STATIC_DRAW);
-	struct vertex_transformation vtransformation;
-	v4f32_set_xyzw (vtransformation.p, 0.0f, 0.0f, 0.0f, 0.0f);
-	qf32_identity (vtransformation.q);
-	shape_square_make (&vtransformation, &vhandler, 0);
-	v4f32_set_xyzw (vtransformation.p, 4.0f, 0.0f, 0.0f, 0.0f);
-	qf32_identity (vtransformation.q);
-	shape_square_make (&vtransformation, &vhandler, 0);
+	shape_square_make (mesharray_allocate_mesh (&marr, 6, GL_TRIANGLES));
+	shape_square_make (mesharray_allocate_mesh (&marr, 6, GL_TRIANGLES));
+	marr.meshes[1].p[0] += 4.0f;
+	mesh_update_transformation (marr.meshes + 0);
+	mesh_update_transformation (marr.meshes + 1);
+	mesh_upload (marr.meshes + 0);
+	mesh_upload (marr.meshes + 1);
 
 
 
@@ -136,6 +112,14 @@ int main (int argc, char * argv[])
 					}
 					break;
 
+				case 'o':
+					shape_square_make (mesharray_allocate_mesh (&marr, 6, GL_TRIANGLES));
+					marr.meshes[2].p[1] += 4.0f;
+					mesh_update_transformation (marr.meshes + 2);
+					mesh_upload (marr.meshes + 2);
+
+					break;
+
 				default:
 					break;
 				}
@@ -148,19 +132,22 @@ int main (int argc, char * argv[])
 
 
 		float r[3];
-		float q[4];
 		r[0] = keyboard [SDL_SCANCODE_KP_1];
 		r[1] = keyboard [SDL_SCANCODE_KP_2];
 		r[2] = keyboard [SDL_SCANCODE_KP_3];
-		qf32_axis_angle (q, r, 0.1f);
-		qf32_mul (vtransformation.q, vtransformation.q, q);
-		qf32_normalize (vtransformation.q, vtransformation.q);
+
 
 		//If rotation is non zero then rotate:
 		if (vf32_sum (3, r))
 		{
-			v4f32_set_xyzw (vtransformation.p, vtransformation.q[3]*5.0f, 0.0f, 0.0f, 0.0f);
-			shape_square_make (&vtransformation, &vhandler, 2);
+			struct mesh * m = marr.meshes + 1;
+			float q[4];
+			qf32_axis_angle (q, r, 0.01f);
+			qf32_mul (m->q, m->q, q);
+			qf32_normalize (m->q, m->q);
+			//v4f32_set_xyzw (m->p, m->q[3]*5.0f, 0.0f, 0.0f, 0.0f);
+			mesh_update_transformation (m);
+			mesh_upload (m);
 		}
 
 		cam.d [0] = 0.1f*(keyboard [SDL_SCANCODE_A] - keyboard [SDL_SCANCODE_D]);
@@ -177,8 +164,7 @@ int main (int argc, char * argv[])
 		glClearColor (0.1f, 0.1f, 0.1f, 0.0f);
 		glClear (GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
-		glBindVertexArray (vao);
-		glDrawArrays (GL_TRIANGLES, 0, 12);
+		mesharray_draw (&marr);
 
 		SDL_Delay (10);
 		SDL_GL_SwapWindow (window);
