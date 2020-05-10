@@ -1,3 +1,5 @@
+#include "csc/csc_crossos.h"
+
 #include <SDL2/SDL.h>
 #include <stdio.h>
 #include <glad.h>
@@ -27,6 +29,7 @@
 
 int main (int argc, char * argv[])
 {
+	csc_crossos_enable_ansi_color ();
 	ASSERT (argc);
 	ASSERT (argv);
 	uint32_t main_flags = MAIN_RUNNING;
@@ -57,6 +60,7 @@ int main (int argc, char * argv[])
 	glEnable (GL_DEPTH_TEST);
 
 	struct mesharray marr;
+	marr.capacity = 3;
 	mesharray_init (&marr);
 
 	shape_square_make (mesharray_allocate_mesh (&marr, 6, GL_TRIANGLES));
@@ -113,7 +117,7 @@ int main (int argc, char * argv[])
 					break;
 
 				case 'o':
-					shape_square_make (mesharray_allocate_mesh (&marr, 6, GL_TRIANGLES));
+					shape_square_make (mesharray_allocate_mesh (&marr, 6, GL_LINE_LOOP));
 					marr.meshes[2].p[1] += 4.0f;
 					mesh_update_transformation (marr.meshes + 2);
 					mesh_upload (marr.meshes + 2);
@@ -142,7 +146,7 @@ int main (int argc, char * argv[])
 		{
 			struct mesh * m = marr.meshes + 1;
 			float q[4];
-			qf32_axis_angle (q, r, 0.01f);
+			qf32_axis_angle (q, r, 0.1f);
 			qf32_mul (m->q, m->q, q);
 			qf32_normalize (m->q, m->q);
 			//v4f32_set_xyzw (m->p, m->q[3]*5.0f, 0.0f, 0.0f, 0.0f);

@@ -18,21 +18,21 @@ struct vertex
 	float col[4];
 };
 
-#define MESH_SHOW UINT32_C(0x00000001)
-#define MESH_ALLOCATED UINT32_C(0x00000001)
+#define MESH_SHOW      UINT32_C(0x00000001)
+#define MESH_ALLOCATED UINT32_C(0x00000002)
 
 struct mesh
 {
 	uint32_t flags;
-	uint32_t vcapacity;
-	uint32_t vlast;
-	GLuint vao;
-	GLuint vbo;
-	GLenum mode;
-	float p[4];
-	float q[4];
-	struct vertex * vertices0;
-	struct vertex * vertices1;
+	uint32_t vcapacity;//Maximum vertices
+	uint32_t vlast;//The index after last added vertex
+	GLuint vao;//OpenGL Vertex array object
+	GLuint vbo;//OpenGL Vertex buffer object
+	GLenum mode;//OpenGL draw mode, e.g. GL_TRIANGLES
+	float p[4];//Position
+	float q[4];//Quaternion
+	struct vertex * vertices0;//Origin vertices
+	struct vertex * vertices1;//Transformed vertices
 };
 
 struct mesharray
@@ -45,6 +45,7 @@ struct mesharray
 
 static void mesh_init (struct mesh * m)
 {
+	ASSERT_PARAM_NOTNULL (m);
 	glGenVertexArrays (1, &m->vao);
 	glGenBuffers (1, &m->vbo);
 	glBindVertexArray (m->vao);
@@ -66,6 +67,7 @@ static void mesh_init (struct mesh * m)
 
 static void mesh_upload (struct mesh * m)
 {
+	ASSERT_PARAM_NOTNULL (m);
 	glBindBuffer (GL_ARRAY_BUFFER, m->vbo);
 	GLintptr offset = 0;
 	GLsizeiptr length = m->vlast * sizeof(struct vertex);
@@ -80,6 +82,7 @@ static void mesh_upload (struct mesh * m)
 
 static void mesh_update_transformation (struct mesh * m)
 {
+	ASSERT_PARAM_NOTNULL (m);
 	struct vertex * v0 = m->vertices0;
 	struct vertex * v1 = m->vertices1;
 	for (uint32_t i = 0; i < m->vlast; ++i)
@@ -95,6 +98,7 @@ static void mesh_update_transformation (struct mesh * m)
 
 static void mesh_push (struct mesh * m, struct vertex vertices[], uint32_t vcount)
 {
+	ASSERT_PARAM_NOTNULL (m);
 	ASSERT ((m->vlast + vcount) <= m->vcapacity);
 	struct vertex * v = m->vertices0 + m->vlast;
 	memcpy (v, vertices, 6 * sizeof (struct vertex));
@@ -105,6 +109,7 @@ static void mesh_push (struct mesh * m, struct vertex vertices[], uint32_t vcoun
 
 static void mesharray_init (struct mesharray * m)
 {
+	ASSERT_PARAM_NOTNULL (m);
 	m->meshes = calloc (m->capacity, sizeof (struct mesh));
 	m->last = 0;
 }
@@ -112,6 +117,7 @@ static void mesharray_init (struct mesharray * m)
 
 static void mesharray_draw (struct mesharray * marr)
 {
+	ASSERT_PARAM_NOTNULL (marr);
 	struct mesh * m = marr->meshes;
 	for (uint32_t i = 0; i < marr->last; ++i)
 	{
@@ -127,7 +133,8 @@ static void mesharray_draw (struct mesharray * marr)
 
 static struct mesh * mesharray_allocate_mesh (struct mesharray * marr, uint32_t vcapacity, GLenum mode)
 {
-	if (marr->last > marr->capacity)
+	ASSERT_PARAM_NOTNULL (marr);
+	if (marr->last >= marr->capacity)
 	{
 		return NULL;
 	}
@@ -143,7 +150,8 @@ static struct mesh * mesharray_allocate_mesh (struct mesharray * marr, uint32_t 
 
 static void shape_square_make (struct mesh * m)
 {
-	struct vertex s[] =
+	ASSERT_PARAM_NOTNULL (m);
+	struct vertex vsquare[] =
 	{
 	{{-1.0f, -1.0f, 0.0f, 1.0f}, {1, 1, 0, 1}},
 	{{ 1.0f, -1.0f, 0.0f, 1.0f}, {0, 1, 0, 1}},
@@ -152,7 +160,7 @@ static void shape_square_make (struct mesh * m)
 	{{ 1.0f,  1.0f, 0.0f, 1.0f}, {0, 0, 1, 1}},
 	{{-1.0f,  1.0f, 0.0f, 1.0f}, {0, 1, 1, 1}},
 	};
-	mesh_push (m, s, 6);
+	mesh_push (m, vsquare, 6);
 }
 
 

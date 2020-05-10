@@ -3,6 +3,7 @@ CONFIG += console
 CONFIG -= app_bundle
 CONFIG -= qt
 
+QMAKE_CFLAGS += -Wno-unused-function
 
 SOURCES += main.c
 SOURCES += glad.c
@@ -11,6 +12,7 @@ HEADERS += glad.h
 HEADERS += khrplatform.h
 HEADERS += csc/csc_sdlcam.h
 HEADERS += csc/csc_math.h
+HEADERS += csc/csc_crossos.h
 HEADERS += mesh.h
 HEADERS += shaper.h
 INCLUDEPATH += C:\msys64\mingw64\include
