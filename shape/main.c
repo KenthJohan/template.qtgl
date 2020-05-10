@@ -28,6 +28,8 @@ enum main_glattr
 
 
 
+
+
 int main (int argc, char * argv[])
 {
 	ASSERT (argc);
@@ -60,67 +62,38 @@ int main (int argc, char * argv[])
 	glEnable (GL_DEPTH_TEST);
 
 	GLuint vao;
-	GLuint vbo[2];
+	GLuint vbo;
 	glGenVertexArrays (1, &vao);
-	glGenBuffers (2, vbo);
+	glGenBuffers (1, &vbo);
 	glBindVertexArray (vao);
 	glEnableVertexAttribArray (main_glattr_pos);
 	glEnableVertexAttribArray (main_glattr_col);
 
-	glBindBuffer (GL_ARRAY_BUFFER, vbo[main_glattr_pos]);
-	glVertexAttribPointer (main_glattr_pos, 3, GL_FLOAT, GL_FALSE, 0, 0);
+	glBindBuffer (GL_ARRAY_BUFFER, vbo);
+	glVertexAttribPointer (main_glattr_pos, 4, GL_FLOAT, GL_FALSE, sizeof (struct vertex), (void*)offsetof (struct vertex, pos));
 
-	glBindBuffer (GL_ARRAY_BUFFER, vbo[main_glattr_col]);
-	glVertexAttribPointer (main_glattr_col, 4, GL_FLOAT, GL_FALSE, 0, 0);
-
-	const GLfloat vertex_pos[] =
-	{
-	0.0f,     0.0f,     0.0f,
-	1.0f,     0.0f,     0.0f,
-	1.0f,     1.0f,     0.0f,
-
-	0.0f,     0.0f,     0.0f,
-	1.0f,     1.0f,     0.0f,
-	0.0f,     1.0f,     0.0f
-	};
-
-	const GLfloat vertex_col[] =
-	{
-	1, 1, 0, 1,
-	0, 1, 0, 1,
-	0, 0, 1, 1,
-
-	1, 1, 0, 1,
-	0, 0, 1, 1,
-	1, 1, 1, 1,
-	};
-
-	struct shaper vertex_pos1;
-	vertex_pos1.last = 0;
-	vertex_pos1.capacity = 12;
-	vertex_pos1.mode = GL_TRIANGLES;
-	shaper_init (&vertex_pos1);
-	shaper_add_square (&vertex_pos1, NULL);
-	shaper_add_square (&vertex_pos1, NULL);
-	struct shape_square sq;
-	v4f32_set_xyzw (sq.p, 0.0f, 0.0f, 0.0f, 0.0f);
-	v4f32_set_xyzw (sq.q, 0.0f, 0.0f, 0.0f, 1.0f);
-	//qf32_xyza (sq.q, 0.0f, 1.0f, 0.0f, 1.0f);
-	shape_square_make (&sq, vertex_pos1.memory);
-	v4f32_set_xyzw (sq.p, 0.0f, 2.0f, 0.0f, 0.0f);
-	v4f32_set_xyzw (sq.q, 0.0f, 0.0f, 0.0f, 1.0f);
-	//qf32_xyza (sq.q, 0.0f, 1.0f, 0.0f, 1.0f);
-	shape_square_make (&sq, vertex_pos1.memory + (sizeof(float)*3*6));
+	glBindBuffer (GL_ARRAY_BUFFER, vbo);
+	glVertexAttribPointer (main_glattr_col, 4, GL_FLOAT, GL_FALSE, sizeof (struct vertex), (void*)offsetof (struct vertex, col));
 
 
-	glBindBuffer (GL_ARRAY_BUFFER, vbo[main_glattr_pos]);
-	glBufferData (GL_ARRAY_BUFFER, vertex_pos1.capacity * sizeof(float) * 3, vertex_pos1.memory, GL_STATIC_DRAW);
 
-	glBindBuffer (GL_ARRAY_BUFFER, vbo[main_glattr_col]);
-	glBufferData (GL_ARRAY_BUFFER, sizeof(vertex_col), vertex_col, GL_STATIC_DRAW);
+	struct vertex_handler vhandler;
+	vhandler.vcapacity = 100;
+	vhandler.scapacity = 10;
+	vertexbatch_init (&vhandler);
+	glBindBuffer (GL_ARRAY_BUFFER, vbo);
+	glBufferData (GL_ARRAY_BUFFER, vhandler.vcapacity * sizeof (struct vertex), NULL, GL_STATIC_DRAW);
+	struct vertex_transformation vtransformation;
+	v4f32_set_xyzw (vtransformation.p, 0.0f, 0.0f, 0.0f, 0.0f);
+	qf32_identity (vtransformation.q);
+	shape_square_make (&vtransformation, &vhandler, 0);
+	v4f32_set_xyzw (vtransformation.p, 4.0f, 0.0f, 0.0f, 0.0f);
+	qf32_identity (vtransformation.q);
+	shape_square_make (&vtransformation, &vhandler, 0);
+
+
 
 	GLuint uniform_mvp = glGetUniformLocation (shader_program, "mvp");
-
 
 
 	struct csc_sdlcam cam;
@@ -173,34 +146,27 @@ int main (int argc, char * argv[])
 			}
 		}
 
+
 		float r[3];
 		float q[4];
 		r[0] = keyboard [SDL_SCANCODE_KP_1];
 		r[1] = keyboard [SDL_SCANCODE_KP_2];
 		r[2] = keyboard [SDL_SCANCODE_KP_3];
 		qf32_axis_angle (q, r, 0.1f);
-		qf32_mul (sq.q, sq.q, q);
-		qf32_normalize (sq.q, sq.q);
+		qf32_mul (vtransformation.q, vtransformation.q, q);
+		qf32_normalize (vtransformation.q, vtransformation.q);
 
-
+		//If rotation is non zero then rotate:
 		if (vf32_sum (3, r))
 		{
-			v4f32_set_xyzw (sq.p, 0.0f, 0.0f, 0.0f, 0.0f);
-			shape_square_make (&sq, vertex_pos1.memory);
-			glBindBuffer (GL_ARRAY_BUFFER, vbo[main_glattr_pos]);
-			glBufferSubData (GL_ARRAY_BUFFER, 0, vertex_pos1.capacity * sizeof(float) * 3, vertex_pos1.memory);
-			//printf ("x %f\n", x);
+			v4f32_set_xyzw (vtransformation.p, vtransformation.q[3]*5.0f, 0.0f, 0.0f, 0.0f);
+			shape_square_make (&vtransformation, &vhandler, 2);
 		}
-
-		//camera_update (&camera, keyboard);
-		//glUniformMatrix4fv (uniform_mvp, 1, GL_FALSE, (const GLfloat *) (camera.mvp));
-
 
 		cam.d [0] = 0.1f*(keyboard [SDL_SCANCODE_A] - keyboard [SDL_SCANCODE_D]);
 		cam.d [1] = 0.1f*(keyboard [SDL_SCANCODE_LCTRL] - keyboard [SDL_SCANCODE_SPACE]);
 		cam.d [2] = 0.1f*(keyboard [SDL_SCANCODE_W] - keyboard [SDL_SCANCODE_S]);
 		cam.d [3] = 0;
-
 		cam.pitch += 0.01f * (keyboard [SDL_SCANCODE_DOWN] - keyboard [SDL_SCANCODE_UP]);
 		cam.yaw += 0.01f * (keyboard [SDL_SCANCODE_RIGHT] - keyboard [SDL_SCANCODE_LEFT]);
 
@@ -212,7 +178,7 @@ int main (int argc, char * argv[])
 		glClear (GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
 		glBindVertexArray (vao);
-		glDrawArrays (GL_TRIANGLES, 0, vertex_pos1.last);
+		glDrawArrays (GL_TRIANGLES, 0, 12);
 
 		SDL_Delay (10);
 		SDL_GL_SwapWindow (window);
