@@ -18,6 +18,23 @@ struct vertex
 	float col[4];
 };
 
+
+static void vertex_update (struct vertex y[], struct vertex x[], unsigned count, float const p[4], float const q[4])
+{
+	ASSERT_PARAM_NOTNULL (y);
+	ASSERT_PARAM_NOTNULL (x);
+	for (uint32_t i = 0; i < count; ++i)
+	{
+		vf32_cpy (4, y->col, x->col);
+		qf32_rotate_vector (q, x->pos, y->pos);
+		vf32_acc (4, y->pos, p);
+		y++;
+		x++;
+	}
+}
+
+
+
 #define MESH_SHOW      UINT32_C(0x00000001)
 #define MESH_ALLOCATED UINT32_C(0x00000002)
 
@@ -129,7 +146,7 @@ struct cmesh
 	float q[4];//Quaternion
 };
 
-static void cvertices_init (struct cmesh * m, unsigned vcount)
+static void cmesh_init (struct cmesh * m, unsigned vcount)
 {
 	m->capacity = vcount;
 	m->v0 = calloc (vcount, sizeof (struct vertex));
@@ -138,7 +155,8 @@ static void cvertices_init (struct cmesh * m, unsigned vcount)
 	v4f32_set_xyzw (m->p, 0.0f, 0.0f, 0.0f, 1.0f);
 }
 
-static void cvertices_add (struct cmesh * m, struct vertex * v, unsigned vcount)
+
+static void cmesh_add (struct cmesh * m, struct vertex * v, unsigned vcount)
 {
 	unsigned last = m->last + vcount;
 	ASSERT (last <= m->capacity);
@@ -146,7 +164,8 @@ static void cvertices_add (struct cmesh * m, struct vertex * v, unsigned vcount)
 	memcpy (m->v0, v, vcount * sizeof (struct vertex));
 }
 
-static void cvertices_add_square (struct cmesh * m)
+
+static void cmesh_add_square (struct cmesh * m)
 {
 	struct vertex s[] =
 	{
@@ -156,24 +175,20 @@ static void cvertices_add_square (struct cmesh * m)
 	{{-1.0f, -1.0f, 0.0f, 1.0f}, {1, 1, 0, 1}},
 	{{ 1.0f,  1.0f, 0.0f, 1.0f}, {0, 0, 1, 1}},
 	{{-1.0f,  1.0f, 0.0f, 1.0f}, {0, 1, 1, 1}}};
-	cvertices_add (m, s, 6);
+	cmesh_add (m, s, 6);
 }
 
 
-static void cvertices_update (struct cmesh * m)
+static void cmesh_update (struct cmesh * m)
 {
 	ASSERT_PARAM_NOTNULL (m);
-	struct vertex * v0 = m->v0;
-	struct vertex * v1 = m->v1;
-	for (uint32_t i = 0; i < m->last; ++i)
-	{
-		vf32_cpy (4, v1->col, v0->col);
-		qf32_rotate_vector (m->q, v0->pos, v1->pos);
-		vf32_acc (4, v1->pos, m->p);
-		v0++;
-		v1++;
-	}
+	vertex_update (m->v1, m->v0, m->last, m->p, m->q);
 }
+
+
+
+
+
 
 
 

@@ -66,15 +66,15 @@ int main (int argc, char * argv[])
 
 
 	struct cmesh cv;
-	cvertices_init (&cv, 100);
-	cvertices_add_square (&cv);
+	cmesh_init (&cv, 100);
+	cmesh_add_square (&cv);
 
-	cvertices_update (&cv);
+	cmesh_update (&cv);
 	gmeshes_allocate (&gm, gmi, cv.v1, cv.last, GL_TRIANGLES);
 	gmi++;
 
 	cv.p[0] = 3.0f;
-	cvertices_update (&cv);
+	cmesh_update (&cv);
 	gmeshes_allocate (&gm, gmi, cv.v1, cv.last, GL_TRIANGLES);
 	gmi++;
 
@@ -126,7 +126,7 @@ int main (int argc, char * argv[])
 				case 'o':
 					zoffset += 1.0f;
 					v4f32_set_xyzw (cv.p, 5.0f, 0.0f, zoffset, 0.0f);
-					cvertices_update (&cv);
+					cmesh_update (&cv);
 					gmeshes_allocate (&gm, gmi, cv.v1, cv.last, GL_TRIANGLES);
 					gmi++;
 					break;
@@ -156,7 +156,7 @@ int main (int argc, char * argv[])
 			qf32_mul (cv.q, cv.q, q);
 			qf32_normalize (cv.q, cv.q);
 			v4f32_set_xyzw (cv.p, 5.0f, 0.0f, 0.0f, 0.0f);
-			cvertices_update (&cv);
+			cmesh_update (&cv);
 			gmeshes_update (&gm, 1, cv.v1, cv.last);
 		}
 		cam.d [0] = 0.1f*(keyboard [SDL_SCANCODE_A] - keyboard [SDL_SCANCODE_D]);
