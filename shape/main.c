@@ -59,17 +59,24 @@ int main (int argc, char * argv[])
 
 	glEnable (GL_DEPTH_TEST);
 
-	struct mesharray marr;
-	marr.capacity = 3;
-	mesharray_init (&marr);
+	struct gmeshes gm;
+	unsigned gmi = 0;
+	float zoffset = 0.0f;
+	gmeshes_init (&gm, 100);
 
-	shape_square_make (mesharray_allocate_mesh (&marr, 6, GL_TRIANGLES));
-	shape_square_make (mesharray_allocate_mesh (&marr, 6, GL_TRIANGLES));
-	marr.meshes[1].p[0] += 4.0f;
-	mesh_update_transformation (marr.meshes + 0);
-	mesh_update_transformation (marr.meshes + 1);
-	mesh_upload (marr.meshes + 0);
-	mesh_upload (marr.meshes + 1);
+
+	struct cmesh cv;
+	cvertices_init (&cv, 100);
+	cvertices_add_square (&cv);
+
+	cvertices_update (&cv);
+	gmeshes_allocate (&gm, gmi, cv.v1, cv.last, GL_TRIANGLES);
+	gmi++;
+
+	cv.p[0] = 3.0f;
+	cvertices_update (&cv);
+	gmeshes_allocate (&gm, gmi, cv.v1, cv.last, GL_TRIANGLES);
+	gmi++;
 
 
 
@@ -117,11 +124,11 @@ int main (int argc, char * argv[])
 					break;
 
 				case 'o':
-					shape_square_make (mesharray_allocate_mesh (&marr, 6, GL_LINE_LOOP));
-					marr.meshes[2].p[1] += 4.0f;
-					mesh_update_transformation (marr.meshes + 2);
-					mesh_upload (marr.meshes + 2);
-
+					zoffset += 1.0f;
+					v4f32_set_xyzw (cv.p, 5.0f, 0.0f, zoffset, 0.0f);
+					cvertices_update (&cv);
+					gmeshes_allocate (&gm, gmi, cv.v1, cv.last, GL_TRIANGLES);
+					gmi++;
 					break;
 
 				default:
@@ -144,16 +151,14 @@ int main (int argc, char * argv[])
 		//If rotation is non zero then rotate:
 		if (vf32_sum (3, r))
 		{
-			struct mesh * m = marr.meshes + 1;
 			float q[4];
 			qf32_axis_angle (q, r, 0.1f);
-			qf32_mul (m->q, m->q, q);
-			qf32_normalize (m->q, m->q);
-			//v4f32_set_xyzw (m->p, m->q[3]*5.0f, 0.0f, 0.0f, 0.0f);
-			mesh_update_transformation (m);
-			mesh_upload (m);
+			qf32_mul (cv.q, cv.q, q);
+			qf32_normalize (cv.q, cv.q);
+			v4f32_set_xyzw (cv.p, 5.0f, 0.0f, 0.0f, 0.0f);
+			cvertices_update (&cv);
+			gmeshes_update (&gm, 1, cv.v1, cv.last);
 		}
-
 		cam.d [0] = 0.1f*(keyboard [SDL_SCANCODE_A] - keyboard [SDL_SCANCODE_D]);
 		cam.d [1] = 0.1f*(keyboard [SDL_SCANCODE_LCTRL] - keyboard [SDL_SCANCODE_SPACE]);
 		cam.d [2] = 0.1f*(keyboard [SDL_SCANCODE_W] - keyboard [SDL_SCANCODE_S]);
@@ -168,7 +173,7 @@ int main (int argc, char * argv[])
 		glClearColor (0.1f, 0.1f, 0.1f, 0.0f);
 		glClear (GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
-		mesharray_draw (&marr);
+		gmeshes_draw (&gm);
 
 		SDL_Delay (10);
 		SDL_GL_SwapWindow (window);
