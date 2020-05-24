@@ -1,8 +1,10 @@
 #pragma once
 
-#include <glad.h>
+
+#include <GL/glew.h>
 #include "csc/csc_debug.h"
 #include "csc/csc_math.h"
+
 
 
 enum main_glattr
@@ -11,123 +13,99 @@ enum main_glattr
 	main_glattr_col
 };
 
-
-struct vertex
-{
-	float pos[4];
-	float col[4];
-};
-
-
-static void vertex_update (struct vertex y[], struct vertex x[], unsigned count, float const p[4], float const q[4])
-{
-	ASSERT_PARAM_NOTNULL (y);
-	ASSERT_PARAM_NOTNULL (x);
-	for (uint32_t i = 0; i < count; ++i)
-	{
-		vf32_cpy (4, y->col, x->col);
-		qf32_rotate_vector (q, x->pos, y->pos);
-		vf32_acc (4, y->pos, p);
-		y++;
-		x++;
-	}
-}
-
-
-
 #define MESH_SHOW      UINT32_C(0x00000001)
 #define MESH_ALLOCATED UINT32_C(0x00000002)
 
-
 struct gmeshes
 {
-	unsigned capacity;
-	GLuint * vao;//OpenGL Vertex array object
-	GLuint * vbo;//OpenGL Vertex buffer object
-	GLenum * mode;//OpenGL draw mode, e.g. GL_TRIANGLES
-	uint32_t * flags;//OpenGL draw mode, e.g. GL_TRIANGLES
-	unsigned * vcount;
+	unsigned cap;//Maximum amount of meshes
+	GLuint * vao;//Array of OpenGL Vertex array object
+	GLuint * vbop;//Array of OpenGL Vertex buffer object position
+	GLuint * vboc;//Array of OpenGL Vertex buffer object color
+	GLenum * mode;//Array of OpenGL draw mode, e.g. GL_TRIANGLES
+	uint32_t * flags;//Array of Misc info
+	unsigned * vcap;//Array of Maximum amount of vertices
+	float * q;
+	float * p;
 };
-
 
 
 static void gmeshes_init (struct gmeshes * m, unsigned count)
 {
 	ASSERT_PARAM_NOTNULL (m);
 	m->vao = calloc (count, sizeof (GLuint));
-	m->vbo = calloc (count, sizeof (GLuint));
+	m->vbop = calloc (count, sizeof (GLuint));
+	m->vboc = calloc (count, sizeof (GLuint));
 	m->mode = calloc (count, sizeof (GLenum));
-	m->vcount = calloc (count, sizeof (unsigned));
+	m->vcap = calloc (count, sizeof (unsigned));
 	m->flags = calloc (count, sizeof (uint32_t));
+	m->q = calloc (count, sizeof (float) * 4);
+	m->p = calloc (count, sizeof (float) * 4);
 	ASSERT (m->vao);
-	ASSERT (m->vbo);
+	ASSERT (m->vbop);
+	ASSERT (m->vboc);
 	ASSERT (m->mode);
-	ASSERT (m->vcount);
+	ASSERT (m->vcap);
 	ASSERT (m->flags);
+	ASSERT (m->q);
+	ASSERT (m->p);
+	for (unsigned i = 0; i < count; ++i)
+	{
+		qf32_identity (m->q + i*4);
+	}
 	//generate names for buffers:
 	glGenVertexArrays (count, m->vao);
-	glGenBuffers (count, m->vbo);
-	m->capacity = count;
+	glGenBuffers (count, m->vbop);
+	glGenBuffers (count, m->vboc);
+	m->cap = count;
 }
 
 
-static GLint gmeshes_size (struct gmeshes * m, unsigned index)
+
+static void gmeshes_allocate (struct gmeshes * m, unsigned index, unsigned vcount, GLenum mode)
 {
 	ASSERT_PARAM_NOTNULL (m);
-	ASSERT (index < m->capacity);
-	ASSERT (glIsBuffer (m->vbo[index]));
-	GLint size = 0;
-	glBindBuffer (GL_ARRAY_BUFFER, m->vbo[index]);
-	glGetBufferParameteriv (GL_ARRAY_BUFFER, GL_BUFFER_SIZE, &size);
-	return size;
-}
-
-
-static void gmeshes_allocate (struct gmeshes * m, unsigned index, struct vertex * vertex, unsigned vcount, GLenum mode)
-{
-	ASSERT_PARAM_NOTNULL (m);
-	ASSERT (index < m->capacity);
+	ASSERT (index < m->cap);
+	GLsizeiptr size = vcount * sizeof (float) * 4;
 	glBindVertexArray (m->vao[index]);
-	glBindBuffer (GL_ARRAY_BUFFER, m->vbo[index]);
-	GLsizeiptr size = vcount * sizeof (struct vertex);
+
+	glBindBuffer (GL_ARRAY_BUFFER, m->vbop[index]);
 	glEnableVertexAttribArray (main_glattr_pos);
+	glVertexAttribPointer (main_glattr_pos, 4, GL_FLOAT, GL_FALSE, sizeof (float) * 4, 0);
+	glBufferData (GL_ARRAY_BUFFER, size, NULL, GL_STATIC_DRAW);
+
+	glBindBuffer (GL_ARRAY_BUFFER, m->vboc[index]);
 	glEnableVertexAttribArray (main_glattr_col);
-	glVertexAttribPointer (main_glattr_pos, 4, GL_FLOAT, GL_FALSE, sizeof (struct vertex), (void*)offsetof (struct vertex, pos));
-	glVertexAttribPointer (main_glattr_col, 4, GL_FLOAT, GL_FALSE, sizeof (struct vertex), (void*)offsetof (struct vertex, col));
-	glBufferData (GL_ARRAY_BUFFER, size, vertex, GL_STATIC_DRAW);
-	m->vcount[index] = vcount;
+	glVertexAttribPointer (main_glattr_col, 4, GL_FLOAT, GL_FALSE, sizeof (float) * 4, 0);
+	glBufferData (GL_ARRAY_BUFFER, size, NULL, GL_STATIC_DRAW);
+
+	m->vcap[index] = vcount;
 	m->mode[index] = mode;
-	m->flags[index] |= MESH_SHOW | MESH_ALLOCATED;
+	m->flags[index] |= MESH_ALLOCATED;
 }
 
 
-static void gmeshes_update (struct gmeshes * m, unsigned index, struct vertex * vertex, unsigned vcount)
+
+static void gmeshes_draw (struct gmeshes * m, GLuint uniform_mvp, float mvp[4*4])
 {
 	ASSERT_PARAM_NOTNULL (m);
-	ASSERT (index < m->capacity);
-	GLuint vbo = m->vbo[index];
-	glBindBuffer (GL_ARRAY_BUFFER, vbo);
-	GLintptr offset = 0;
-	GLsizeiptr length = vcount * sizeof(struct vertex);
-	ASSERT (glGetError() == GL_NO_ERROR);
-	struct vertex * vg = glMapBufferRange (GL_ARRAY_BUFFER, offset, length, GL_MAP_WRITE_BIT);
-	ASSERT (glGetError() == GL_NO_ERROR);
-	ASSERT (vg);
-	memcpy (vg, vertex, length);
-	glUnmapBuffer (GL_ARRAY_BUFFER);
-}
-
-
-static void gmeshes_draw (struct gmeshes * m)
-{
-	ASSERT_PARAM_NOTNULL (m);
-	for (unsigned i = 0; i < m->capacity; ++i)
+	glClearColor (0.1f, 0.1f, 0.1f, 0.0f);
+	glClear (GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+	for (unsigned i = 0; i < m->cap; ++i)
 	{
-		GLuint vao = m->vao[i];
-		GLenum mode = m->mode[i];
-		unsigned vcount = m->vcount[i];
-		if (m->flags[i] & (MESH_ALLOCATED | MESH_SHOW))
+		GLuint vao = m->vao[i];//Mesh Vertex array object
+		GLenum mode = m->mode[i];//Mesh mode, Specifies what kind of primitives to render
+		float * p = m->p + (i*4);//Mesh Position
+		float * q = m->q + (i*4);//Mesh Quaternion
+		unsigned vcount = m->vcap[i];
+		if (m->flags[i] & (MESH_SHOW))
 		{
+			float mmvp[4*4];//Matrix Model View Projection
+			m4f32_identity (mmvp);//Init matrix
+			m4f32_translation (mmvp, p);//Set translation values from position
+			qf32_m4 (mmvp, q);//Set matrix values from quaternion
+			m4f32_mul (mmvp, mvp, mmvp);//Apply model transformation to the Matrix View Projection
+			glUniformMatrix4fv (uniform_mvp, 1, GL_FALSE, (const GLfloat *) mmvp);
 			glBindVertexArray (vao);
 			glDrawArrays (mode, 0, vcount);
 		}
@@ -135,56 +113,57 @@ static void gmeshes_draw (struct gmeshes * m)
 }
 
 
-
-struct cmesh
-{
-	unsigned capacity;
-	unsigned last;
-	struct vertex * v0;
-	struct vertex * v1;
-	float p[4];//Position
-	float q[4];//Quaternion
-};
-
-static void cmesh_init (struct cmesh * m, unsigned vcount)
-{
-	m->capacity = vcount;
-	m->v0 = calloc (vcount, sizeof (struct vertex));
-	m->v1 = calloc (vcount, sizeof (struct vertex));
-	qf32_identity (m->q);
-	v4f32_set_xyzw (m->p, 0.0f, 0.0f, 0.0f, 1.0f);
-}
-
-
-static void cmesh_add (struct cmesh * m, struct vertex * v, unsigned vcount)
-{
-	unsigned last = m->last + vcount;
-	ASSERT (last <= m->capacity);
-	m->last += vcount;
-	memcpy (m->v0, v, vcount * sizeof (struct vertex));
-}
-
-
-static void cmesh_add_square (struct cmesh * m)
-{
-	struct vertex s[] =
-	{
-	{{-1.0f, -1.0f, 0.0f, 1.0f}, {1, 1, 0, 1}},
-	{{ 1.0f, -1.0f, 0.0f, 1.0f}, {0, 1, 0, 1}},
-	{{ 1.0f,  1.0f, 0.0f, 1.0f}, {0, 0, 1, 1}},
-	{{-1.0f, -1.0f, 0.0f, 1.0f}, {1, 1, 0, 1}},
-	{{ 1.0f,  1.0f, 0.0f, 1.0f}, {0, 0, 1, 1}},
-	{{-1.0f,  1.0f, 0.0f, 1.0f}, {0, 1, 1, 1}}};
-	cmesh_add (m, s, 6);
-}
-
-
-static void cmesh_update (struct cmesh * m)
+static void gmeshes_update (struct gmeshes * m, unsigned index, enum main_glattr attr, float const v[], unsigned vcount)
 {
 	ASSERT_PARAM_NOTNULL (m);
-	vertex_update (m->v1, m->v0, m->last, m->p, m->q);
+	ASSERT (index < m->cap);
+	GLuint vbo;
+	switch (attr)
+	{
+	case main_glattr_pos:
+		vbo = m->vbop[index];
+		break;
+	case main_glattr_col:
+		vbo = m->vboc[index];
+		break;
+	}
+	glBindBuffer (GL_ARRAY_BUFFER, vbo);
+	GLintptr offset = 0;
+	ASSERT (vcount <= m->vcap[index]);
+	GLsizeiptr length = vcount * sizeof (float) * 4;
+	ASSERT (glGetError() == GL_NO_ERROR);
+	struct vertex * vg = glMapBufferRange (GL_ARRAY_BUFFER, offset, length, GL_MAP_WRITE_BIT);
+	ASSERT (glGetError() == GL_NO_ERROR);
+	ASSERT (vg);
+	memcpy (vg, v, length);
+	glUnmapBuffer (GL_ARRAY_BUFFER);
 }
 
+
+
+static void gmeshes_square (struct gmeshes * m, unsigned index)
+{
+	float const s[] =
+	{
+	-1.0f, -1.0f, 0.0f, 1.0f,
+	 1.0f, -1.0f, 0.0f, 1.0f,
+	 1.0f,  1.0f, 0.0f, 1.0f,
+	-1.0f, -1.0f, 0.0f, 1.0f,
+	 1.0f,  1.0f, 0.0f, 1.0f,
+	-1.0f,  1.0f, 0.0f, 1.0f
+	};
+	gmeshes_update (m, index, main_glattr_pos, s, 6);
+	float const c[] =
+	{
+	0.0f, 1.0f, 0.0f, 1.0f,
+	0.0f, 1.0f, 0.0f, 1.0f,
+	0.0f, 1.0f, 0.0f, 1.0f,
+	0.0f, 0.0f, 1.0f, 1.0f,
+	0.0f, 0.0f, 1.0f, 1.0f,
+	0.0f, 0.0f, 1.0f, 1.0f
+	};
+	gmeshes_update (m, index, main_glattr_col, c, 6);
+}
 
 
 

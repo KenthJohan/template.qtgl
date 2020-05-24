@@ -4,6 +4,6 @@ out vec4 out_color;
 void main()
 {
 	vec4 t = vertex_color;
-	t.r = cos(100.0*vertex_color.g);
+	//t.r = cos(100.0*vertex_color.g);
 	out_color = t;
 };
