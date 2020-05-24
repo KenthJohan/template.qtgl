@@ -166,6 +166,22 @@ static void gmeshes_square (struct gmeshes * m, unsigned index)
 }
 
 
+static void gmeshes_line (struct gmeshes * m, unsigned index, float a[], float b[])
+{
+	float s[4*2];
+	memcpy(s+0*4, a, sizeof (float) * 4);
+	memcpy(s+1*4, b, sizeof (float) * 4);
+	gmeshes_update (m, index, main_glattr_pos, s, 2);
+	float const c[] =
+	{
+	1.0f, 1.0f, 1.0f, 1.0f,
+	1.0f, 1.0f, 1.0f, 1.0f
+	};
+	gmeshes_update (m, index, main_glattr_col, c, 2);
+}
+
+
+
 
 
 
