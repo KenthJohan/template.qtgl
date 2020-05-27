@@ -113,6 +113,7 @@ static void gmeshes_draw (struct gmeshes * m, GLuint uniform_mvp, float mvp[4*4]
 }
 
 
+
 static void gmeshes_update (struct gmeshes * m, unsigned index, enum main_glattr attr, float const v[], unsigned vcount)
 {
 	ASSERT_PARAM_NOTNULL (m);
@@ -132,10 +133,10 @@ static void gmeshes_update (struct gmeshes * m, unsigned index, enum main_glattr
 	ASSERT (vcount <= m->vcap[index]);
 	GLsizeiptr length = vcount * sizeof (float) * 4;
 	ASSERT (glGetError() == GL_NO_ERROR);
-	struct vertex * vg = glMapBufferRange (GL_ARRAY_BUFFER, offset, length, GL_MAP_WRITE_BIT);
+	float * mem = glMapBufferRange (GL_ARRAY_BUFFER, offset, length, GL_MAP_WRITE_BIT);
 	ASSERT (glGetError() == GL_NO_ERROR);
-	ASSERT (vg);
-	memcpy (vg, v, length);
+	ASSERT (mem);
+	memcpy (mem, v, length);
 	glUnmapBuffer (GL_ARRAY_BUFFER);
 }
 
@@ -178,6 +179,39 @@ static void gmeshes_line (struct gmeshes * m, unsigned index, float a[], float b
 	1.0f, 1.0f, 1.0f, 1.0f
 	};
 	gmeshes_update (m, index, main_glattr_col, c, 2);
+}
+
+
+static void gmeshes_points (struct gmeshes * m, unsigned index)
+{
+	GLintptr offset = 0;
+	unsigned n = m->vcap[index];
+	GLsizeiptr length = n * sizeof(float) * 4;
+	float * v;
+
+	glBindBuffer (GL_ARRAY_BUFFER, m->vbop[index]);
+	v = glMapBufferRange (GL_ARRAY_BUFFER, offset, length, GL_MAP_WRITE_BIT);
+	for (unsigned i = 0; i < n; ++i)
+	{
+		v[0] = (float)rand() / (float)RAND_MAX;
+		v[1] = (float)rand() / (float)RAND_MAX;
+		v[2] = (float)rand() / (float)RAND_MAX;
+		v[3] = 1.0f;
+		v += 4;
+	}
+	glUnmapBuffer (GL_ARRAY_BUFFER);
+
+	glBindBuffer (GL_ARRAY_BUFFER, m->vboc[index]);
+	v = glMapBufferRange (GL_ARRAY_BUFFER, offset, length, GL_MAP_WRITE_BIT);
+	for (unsigned i = 0; i < n; ++i)
+	{
+		v[0] = 1.0f;
+		v[1] = 1.0f;
+		v[2] = 1.0f;
+		v[3] = 1.0f;
+		v += 4;
+	}
+	glUnmapBuffer (GL_ARRAY_BUFFER);
 }
 
 

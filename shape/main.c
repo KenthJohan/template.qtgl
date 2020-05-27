@@ -7,6 +7,7 @@
 #include <nng/protocol/pubsub0/sub.h>
 #include <nng/protocol/reqrep0/rep.h>
 #include <nng/protocol/reqrep0/req.h>
+#include <nng/protocol/pair0/pair.h>
 #include <nng/supplemental/util/platform.h>
 
 #include <SDL2/SDL.h>
@@ -59,8 +60,68 @@ enum main_drawobj
 	MAIN_DRAWOBJ_SQUARE1,
 	MAIN_DRAWOBJ_SQUARE2,
 	MAIN_DRAWOBJ_MOUSELINE,
+	MAIN_DRAWOBJ_POINTCLOUD,
 	MAIN_DRAWOBJ_COUNT
 };
+
+
+enum gtype
+{
+	GTYPE_V4F32,
+	GTYPE_M4F32
+};
+
+unsigned gtype_size (enum gtype type)
+{
+	switch (type)
+	{
+	case GTYPE_V4F32: return sizeof(float)*4;
+	case GTYPE_M4F32: return sizeof(float)*4*4;
+	}
+	return 0;
+}
+
+
+struct interface1
+{
+	char const * name;
+	char const * address;
+	enum gtype type;
+	void * data;
+	nng_socket socket;
+};
+
+
+void interface1_init (struct interface1 iface[])
+{
+	for (;iface->name != NULL; iface++)
+	{
+		int r;
+		r = nng_pair0_open (&(iface->socket));
+		NNG_EXIT_ON_ERROR (r);
+		r = nng_listen (iface->socket, iface->address, NULL, 0);
+		NNG_EXIT_ON_ERROR (r);
+	}
+}
+
+
+void interface1_send (struct interface1 iface[])
+{
+	for (;iface->name != NULL; iface++)
+	{
+		int r;
+		size_t size = gtype_size (iface->type);
+		r = nng_send (iface->socket, iface->data, size, NNG_FLAG_NONBLOCK);
+		if (r != NNG_EAGAIN)
+		{
+			NNG_EXIT_ON_ERROR (r);
+		}
+	}
+}
+
+
+
+
 
 
 
@@ -71,15 +132,6 @@ int main (int argc, char * argv[])
 	ASSERT (argc);
 	ASSERT (argv);
 
-	nng_socket pub;
-	{
-		int r;
-		r = nng_pub0_open (&pub);
-		NNG_EXIT_ON_ERROR (r);
-		r = nng_dial (pub, ADDRESS_PUB, NULL, 0);
-		//r = nng_listen (pub, ADDRESS, NULL, 0);
-		NNG_EXIT_ON_ERROR (r);
-	}
 
 	uint32_t main_flags = MAIN_RUNNING;
 	SDL_Window * window;
@@ -120,22 +172,37 @@ int main (int argc, char * argv[])
 	glUseProgram (shader_program);
 
 	glEnable (GL_DEPTH_TEST);
+	glEnable (GL_PROGRAM_POINT_SIZE_EXT);
+	glPointSize (10.0f);
 
 	struct gmeshes gm;
 	gmeshes_init (&gm, 100);
 	gmeshes_allocate (&gm, MAIN_DRAWOBJ_SQUARE1, 6, GL_TRIANGLES);
 	gmeshes_allocate (&gm, MAIN_DRAWOBJ_SQUARE2, 6, GL_TRIANGLES);
 	gmeshes_allocate (&gm, MAIN_DRAWOBJ_MOUSELINE, 2, GL_LINES);
+	gmeshes_allocate (&gm, MAIN_DRAWOBJ_POINTCLOUD, 100, GL_POINTS);
 	gmeshes_square (&gm, MAIN_DRAWOBJ_SQUARE1);
 	gm.flags[MAIN_DRAWOBJ_SQUARE1] |= MESH_SHOW;
 	gmeshes_square (&gm, MAIN_DRAWOBJ_SQUARE2);
 	gm.flags[MAIN_DRAWOBJ_SQUARE2] |= MESH_SHOW;
+	gmeshes_points (&gm, MAIN_DRAWOBJ_POINTCLOUD);
+	gm.flags[MAIN_DRAWOBJ_POINTCLOUD] |= MESH_SHOW;
 
 
 
 	GLuint uniform_mvp = glGetUniformLocation (shader_program, "mvp");
 	struct csc_sdlcam cam;
 	csc_sdlcam_init (&cam);
+
+
+
+	struct interface1 iface[] =
+	{
+	{.name = "cam_mr", .address = "tcp://:9000", .type = GTYPE_M4F32, .data = cam.mr},
+	{.name = "cam_mp", .address = "tcp://:9001", .type = GTYPE_M4F32, .data = cam.mp},
+	{.name = NULL}
+};
+	interface1_init (iface);
 
 
 	const Uint8 * keyboard = SDL_GetKeyboardState (NULL);
@@ -228,39 +295,47 @@ int main (int argc, char * argv[])
 		}
 
 
+		{
+			//Rotate a mesh:
+			float r[4];
+			r[0] = keyboard [SDL_SCANCODE_KP_1];
+			r[1] = keyboard [SDL_SCANCODE_KP_2];
+			r[2] = keyboard [SDL_SCANCODE_KP_3];
+			vsf32_macc (gm.p + MAIN_DRAWOBJ_SQUARE1*4, r, 0.1f, 3);
+			r[0] = keyboard [SDL_SCANCODE_KP_4];
+			r[1] = keyboard [SDL_SCANCODE_KP_5];
+			r[2] = keyboard [SDL_SCANCODE_KP_6];
+			qf32_axis_angle (r, r, vf32_sum (3, r) ? 0.1f : 0.0f);
+			qf32_mul (gm.q + MAIN_DRAWOBJ_SQUARE1*4, gm.q + MAIN_DRAWOBJ_SQUARE1*4, r);
+			qf32_normalize (gm.q + MAIN_DRAWOBJ_SQUARE1*4, gm.q + MAIN_DRAWOBJ_SQUARE1*4);
+		}
 
-		//Rotate a mesh:
-		float r[4];
-		r[0] = keyboard [SDL_SCANCODE_KP_1];
-		r[1] = keyboard [SDL_SCANCODE_KP_2];
-		r[2] = keyboard [SDL_SCANCODE_KP_3];
-		vsf32_macc (gm.p + MAIN_DRAWOBJ_SQUARE1*4, r, 0.1f, 3);
-		r[0] = keyboard [SDL_SCANCODE_KP_4];
-		r[1] = keyboard [SDL_SCANCODE_KP_5];
-		r[2] = keyboard [SDL_SCANCODE_KP_6];
-		qf32_axis_angle (r, r, vf32_sum (3, r) ? 0.1f : 0.0f);
-		qf32_mul (gm.q + MAIN_DRAWOBJ_SQUARE1*4, gm.q + MAIN_DRAWOBJ_SQUARE1*4, r);
-		qf32_normalize (gm.q + MAIN_DRAWOBJ_SQUARE1*4, gm.q + MAIN_DRAWOBJ_SQUARE1*4);
 
-		//Camera:
-		cam.d [0] = 0.1f*(keyboard [SDL_SCANCODE_A] - keyboard [SDL_SCANCODE_D]);
-		cam.d [1] = 0.1f*(keyboard [SDL_SCANCODE_LCTRL] - keyboard [SDL_SCANCODE_SPACE]);
-		cam.d [2] = 0.1f*(keyboard [SDL_SCANCODE_W] - keyboard [SDL_SCANCODE_S]);
-		cam.d [3] = 0;
-		cam.pitchd = 0.01f * (keyboard [SDL_SCANCODE_DOWN] - keyboard [SDL_SCANCODE_UP]);
-		cam.yawd = 0.01f * (keyboard [SDL_SCANCODE_RIGHT] - keyboard [SDL_SCANCODE_LEFT]);
-		cam.rolld = 0.01f * (keyboard [SDL_SCANCODE_Q] - keyboard [SDL_SCANCODE_E]);
-		csc_sdlcam_build (&cam);
+		{
+			//Camera:
+			cam.d [0] = 0.1f*(keyboard [SDL_SCANCODE_A] - keyboard [SDL_SCANCODE_D]);
+			cam.d [1] = 0.1f*(keyboard [SDL_SCANCODE_LCTRL] - keyboard [SDL_SCANCODE_SPACE]);
+			cam.d [2] = 0.1f*(keyboard [SDL_SCANCODE_W] - keyboard [SDL_SCANCODE_S]);
+			cam.d [3] = 0;
+			cam.pitchd = 0.01f * (keyboard [SDL_SCANCODE_DOWN] - keyboard [SDL_SCANCODE_UP]);
+			cam.yawd = 0.01f * (keyboard [SDL_SCANCODE_RIGHT] - keyboard [SDL_SCANCODE_LEFT]);
+			cam.rolld = 0.01f * (keyboard [SDL_SCANCODE_Q] - keyboard [SDL_SCANCODE_E]);
+			csc_sdlcam_build (&cam);
+		}
+
+
 
 		//Send camera info to network
 		if (cam.pitchd || cam.yawd || cam.rolld || vf32_sum (3, cam.d))
 		{
 			//m4f32_print(cam.mr, stdout);
-			int r;
+			//int r;
 			//printf ("nng_send %f\n", cam.mvp[0]);
-			r = nng_send (pub, cam.mr, sizeof (float)*4*4, 0);
-			NNG_EXIT_ON_ERROR (r);
+			//r = nng_send (pub, cam.mr, sizeof (float)*4*4, 0);
+			//NNG_EXIT_ON_ERROR (r);
 		}
+
+		interface1_send (iface);
 
 
 		gmeshes_draw (&gm, uniform_mvp, cam.mvp);
