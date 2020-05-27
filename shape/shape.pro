@@ -14,6 +14,7 @@ HEADERS += csc/csc_math.h
 HEADERS += csc/csc_crossos.h
 HEADERS += mesh.h
 HEADERS += shaper.h
+HEADERS += proj1.h
 INCLUDEPATH += C:/msys64/mingw64/include
 INCLUDEPATH += $$PWD/nng/include
 
