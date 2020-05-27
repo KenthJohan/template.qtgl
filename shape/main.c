@@ -68,7 +68,8 @@ enum main_drawobj
 enum gtype
 {
 	GTYPE_V4F32,
-	GTYPE_M4F32
+	GTYPE_M4F32,
+	GTYPE_VF32
 };
 
 unsigned gtype_size (enum gtype type)
@@ -77,17 +78,24 @@ unsigned gtype_size (enum gtype type)
 	{
 	case GTYPE_V4F32: return sizeof(float)*4;
 	case GTYPE_M4F32: return sizeof(float)*4*4;
+	default:return 0;
 	}
-	return 0;
 }
 
+#define INTERFACE1_READ  UINT64_C (0x01)
+#define INTERFACE1_WRITE UINT64_C (0x02)
 
 struct interface1
 {
 	char const * name;
 	char const * address;
+	uint64_t flag;
 	enum gtype type;
-	void * data;
+	union
+	{
+		void * data;
+		unsigned mesh;
+	};
 	nng_socket socket;
 };
 
@@ -109,12 +117,49 @@ void interface1_send (struct interface1 iface[])
 {
 	for (;iface->name != NULL; iface++)
 	{
+		if ((iface->flag & INTERFACE1_READ) == 0) {continue;}
 		int r;
 		size_t size = gtype_size (iface->type);
 		r = nng_send (iface->socket, iface->data, size, NNG_FLAG_NONBLOCK);
 		if (r != NNG_EAGAIN)
 		{
 			NNG_EXIT_ON_ERROR (r);
+		}
+	}
+}
+
+
+void interface1_recv (struct interface1 iface[], struct gmeshes * gm)
+{
+	for (;iface->name != NULL; iface++)
+	{
+		if ((iface->flag & INTERFACE1_WRITE) == 0) {continue;}
+		int rv;
+		size_t sz;
+		float * val = NULL;
+
+
+		rv = nng_recv (iface->socket, &val, &sz, NNG_FLAG_ALLOC | NNG_FLAG_NONBLOCK);
+		if (rv == 0)
+		{
+			printf ("New message %i\n", sz);
+
+			switch (iface->type)
+			{
+			case GTYPE_VF32:{
+				glBindBuffer (GL_ARRAY_BUFFER, gm->vbop[iface->mesh]);
+				GLsizeiptr length = MIN(gm->vcap[iface->mesh] * sizeof(float) * 4, sz);
+				float * v = glMapBufferRange (GL_ARRAY_BUFFER, 0, length, GL_MAP_WRITE_BIT);
+				memcpy(v, val, length);
+				glUnmapBuffer (GL_ARRAY_BUFFER);
+			}break;
+			}
+
+			nng_free (val, sz);
+		}
+		else if (rv != NNG_EAGAIN)
+		{
+			NNG_EXIT_ON_ERROR (rv);
 		}
 	}
 }
@@ -198,10 +243,12 @@ int main (int argc, char * argv[])
 
 	struct interface1 iface[] =
 	{
-	{.name = "cam_mr", .address = "tcp://:9000", .type = GTYPE_M4F32, .data = cam.mr},
-	{.name = "cam_mp", .address = "tcp://:9001", .type = GTYPE_M4F32, .data = cam.mp},
+	{.name = "cam_mr",     .address = "tcp://:9000", .flag = INTERFACE1_READ, .type = GTYPE_M4F32, .data = cam.mr},
+	{.name = "cam_mp",     .address = "tcp://:9001", .flag = INTERFACE1_READ, .type = GTYPE_M4F32, .data = cam.mp},
+	{.name = "pointcloud", .address = "tcp://:9002", .flag = INTERFACE1_WRITE, .type = GTYPE_VF32, .mesh = MAIN_DRAWOBJ_POINTCLOUD},
 	{.name = NULL}
 };
+
 	interface1_init (iface);
 
 
@@ -336,6 +383,7 @@ int main (int argc, char * argv[])
 		}
 
 		interface1_send (iface);
+		interface1_recv (iface, &gm);
 
 
 		gmeshes_draw (&gm, uniform_mvp, cam.mvp);
