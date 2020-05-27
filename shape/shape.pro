@@ -15,6 +15,7 @@ HEADERS += csc/csc_crossos.h
 HEADERS += mesh.h
 HEADERS += shaper.h
 HEADERS += proj1.h
+HEADERS += ray_triangle_intersect.h
 INCLUDEPATH += C:/msys64/mingw64/include
 INCLUDEPATH += $$PWD/nng/include
 

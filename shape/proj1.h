@@ -3,7 +3,29 @@
 #include <SDL2/SDL.h>
 #include "csc/csc_sdlcam.h"
 
-void proj1 (SDL_Window * window, struct csc_sdlcam * cam, float world[4])
+
+
+
+/*
+glm::vec3 CFreeCamera::CreateRay() {
+	// these positions must be in range [-1, 1] (!!!), not [0, width] and [0, height]
+	float mouseX = getMousePositionX() / (getWindowWidth()  * 0.5f) - 1.0f;
+	float mouseY = getMousePositionY() / (getWindowHeight() * 0.5f) - 1.0f;
+
+	glm::mat4 proj = glm::perspective(FoV, AspectRatio, Near, Far);
+	glm::mat4 view = glm::lookAt(glm::vec3(0.0f), CameraDirection, CameraUpVector);
+
+	glm::mat4 invVP = glm::inverse(proj * view);
+	glm::vec4 screenPos = glm::vec4(mouseX, -mouseY, 1.0f, 1.0f);
+	glm::vec4 worldPos = invVP * screenPos;
+
+	glm::vec3 dir = glm::normalize(glm::vec3(worldPos));
+
+	return dir;
+}
+*/
+
+static void proj1 (SDL_Window * window, struct csc_sdlcam * cam, float world[4])
 {
 	int x;
 	int y;
@@ -40,7 +62,7 @@ void proj1 (SDL_Window * window, struct csc_sdlcam * cam, float world[4])
 
 
 
-void proj2 (SDL_Window * window, struct csc_sdlcam * cam, float world[4])
+static void proj2 (SDL_Window * window, struct csc_sdlcam * cam, float world[4])
 {
 	int x;
 	int y;
