@@ -209,6 +209,11 @@ int main (int argc, char * argv[])
 	glDebugMessageControl (GL_DONT_CARE, GL_DONT_CARE, GL_DONT_CARE, 0, NULL, GL_FALSE);//Disable all messages
 	glDebugMessageControl (GL_DEBUG_SOURCE_API, GL_DEBUG_TYPE_ERROR, GL_DONT_CARE, 0, NULL, GL_TRUE);//Enable error messages
 
+	glEnable (GL_DEPTH_TEST);
+	glEnable (GL_PROGRAM_POINT_SIZE_EXT);
+	glEnable (GL_VERTEX_PROGRAM_POINT_SIZE);
+	glPointSize (10.0f);
+
 	char const * shaderfiles[] = {"../shape/shader.glvs", "../shape/shader.glfs", NULL};
 	GLuint shader_program = csc_gl_program_from_files (shaderfiles);
 	glBindAttribLocation (shader_program, main_glattr_pos, "pos" );
@@ -216,16 +221,14 @@ int main (int argc, char * argv[])
 	glLinkProgram (shader_program);
 	glUseProgram (shader_program);
 
-	glEnable (GL_DEPTH_TEST);
-	glEnable (GL_PROGRAM_POINT_SIZE_EXT);
-	glPointSize (10.0f);
+
 
 	struct gmeshes gm;
 	gmeshes_init (&gm, 100);
 	gmeshes_allocate (&gm, MAIN_DRAWOBJ_SQUARE1, 6, GL_TRIANGLES);
 	gmeshes_allocate (&gm, MAIN_DRAWOBJ_SQUARE2, 6, GL_TRIANGLES);
 	gmeshes_allocate (&gm, MAIN_DRAWOBJ_MOUSELINE, 2, GL_LINES);
-	gmeshes_allocate (&gm, MAIN_DRAWOBJ_POINTCLOUD, 100, GL_POINTS);
+	gmeshes_allocate (&gm, MAIN_DRAWOBJ_POINTCLOUD, 320*20, GL_POINTS);
 	gmeshes_square (&gm, MAIN_DRAWOBJ_SQUARE1);
 	gm.flags[MAIN_DRAWOBJ_SQUARE1] |= MESH_SHOW;
 	gmeshes_square (&gm, MAIN_DRAWOBJ_SQUARE2);
