@@ -61,6 +61,8 @@ enum main_drawobj
 	MAIN_DRAWOBJ_SQUARE2,
 	MAIN_DRAWOBJ_MOUSELINE,
 	MAIN_DRAWOBJ_POINTCLOUD,
+	MAIN_DRAWOBJ_PLANEFIT,
+	MAIN_DRAWOBJ_NORMAL,
 	MAIN_DRAWOBJ_COUNT
 };
 
@@ -69,7 +71,7 @@ enum gtype
 {
 	GTYPE_V4F32,
 	GTYPE_M4F32,
-	GTYPE_VF32
+	GTYPE_VBO_VF32
 };
 
 unsigned gtype_size (enum gtype type)
@@ -146,13 +148,16 @@ void interface1_recv (struct interface1 iface[], struct gmeshes * gm)
 
 			switch (iface->type)
 			{
-			case GTYPE_VF32:{
+			case GTYPE_VBO_VF32:{
 				glBindBuffer (GL_ARRAY_BUFFER, gm->vbop[iface->mesh]);
 				GLsizeiptr length = MIN(gm->vcap[iface->mesh] * sizeof(float) * 4, sz);
 				float * v = glMapBufferRange (GL_ARRAY_BUFFER, 0, length, GL_MAP_WRITE_BIT);
 				memcpy(v, val, length);
 				glUnmapBuffer (GL_ARRAY_BUFFER);
 			}break;
+			case GTYPE_V4F32:
+				memcpy (iface->data, val, sizeof (float)*4);
+			break;
 			}
 
 			nng_free (val, sz);
@@ -213,6 +218,7 @@ int main (int argc, char * argv[])
 	glEnable (GL_PROGRAM_POINT_SIZE_EXT);
 	glEnable (GL_VERTEX_PROGRAM_POINT_SIZE);
 	glPointSize (10.0f);
+	glLineWidth (20.0f);
 
 	char const * shaderfiles[] = {"../shape/shader.glvs", "../shape/shader.glfs", NULL};
 	GLuint shader_program = csc_gl_program_from_files (shaderfiles);
@@ -229,14 +235,26 @@ int main (int argc, char * argv[])
 	gmeshes_allocate (&gm, MAIN_DRAWOBJ_SQUARE2, 6, GL_TRIANGLES);
 	gmeshes_allocate (&gm, MAIN_DRAWOBJ_MOUSELINE, 2, GL_LINES);
 	gmeshes_allocate (&gm, MAIN_DRAWOBJ_POINTCLOUD, 320*20, GL_POINTS);
+	gmeshes_allocate (&gm, MAIN_DRAWOBJ_PLANEFIT, 6, GL_TRIANGLES);
+	gmeshes_allocate (&gm, MAIN_DRAWOBJ_NORMAL, 6, GL_LINES);
+
+	gmeshes_color (&gm, MAIN_DRAWOBJ_SQUARE1, 1.0f, 0.0f, 0.0f);
+	gmeshes_color (&gm, MAIN_DRAWOBJ_SQUARE2, 1.0f, 0.0f, 0.0f);
+	gmeshes_color (&gm, MAIN_DRAWOBJ_MOUSELINE, 1.0f, 0.0f, 0.0f);
+	gmeshes_color (&gm, MAIN_DRAWOBJ_POINTCLOUD, 1.0f, 1.0f, 1.0f);
+	gmeshes_color (&gm, MAIN_DRAWOBJ_PLANEFIT, 1.0f, 1.0f, 0.0f);
+	gmeshes_color (&gm, MAIN_DRAWOBJ_NORMAL, 1.0f, 0.0f, 1.0f);
+
 	gmeshes_square (&gm, MAIN_DRAWOBJ_SQUARE1);
-	gm.flags[MAIN_DRAWOBJ_SQUARE1] |= MESH_SHOW;
 	gmeshes_square (&gm, MAIN_DRAWOBJ_SQUARE2);
-	gm.flags[MAIN_DRAWOBJ_SQUARE2] |= MESH_SHOW;
 	gmeshes_points (&gm, MAIN_DRAWOBJ_POINTCLOUD);
+	gmeshes_square (&gm, MAIN_DRAWOBJ_PLANEFIT);
+
+	gm.flags[MAIN_DRAWOBJ_SQUARE1] &= ~MESH_SHOW;
+	gm.flags[MAIN_DRAWOBJ_SQUARE2] &= ~MESH_SHOW;
 	gm.flags[MAIN_DRAWOBJ_POINTCLOUD] |= MESH_SHOW;
-
-
+	gm.flags[MAIN_DRAWOBJ_PLANEFIT] |= MESH_SHOW;
+	gm.flags[MAIN_DRAWOBJ_NORMAL] |= MESH_SHOW;
 
 	GLuint uniform_mvp = glGetUniformLocation (shader_program, "mvp");
 	struct csc_sdlcam cam;
@@ -248,7 +266,10 @@ int main (int argc, char * argv[])
 	{
 	{.name = "cam_mr",     .address = "tcp://:9000", .flag = INTERFACE1_READ, .type = GTYPE_M4F32, .data = cam.mr},
 	{.name = "cam_mp",     .address = "tcp://:9001", .flag = INTERFACE1_READ, .type = GTYPE_M4F32, .data = cam.mp},
-	{.name = "pointcloud", .address = "tcp://:9002", .flag = INTERFACE1_WRITE, .type = GTYPE_VF32, .mesh = MAIN_DRAWOBJ_POINTCLOUD},
+	{.name = "pointcloud", .address = "tcp://:9002", .flag = INTERFACE1_WRITE, .type = GTYPE_VBO_VF32, .mesh = MAIN_DRAWOBJ_POINTCLOUD},
+	{.name = "planefit_p", .address = "tcp://:9003", .flag = INTERFACE1_WRITE, .type = GTYPE_V4F32, .data = gm.p + MAIN_DRAWOBJ_PLANEFIT*4},
+	{.name = "planefit_q", .address = "tcp://:9004", .flag = INTERFACE1_WRITE, .type = GTYPE_V4F32, .data = gm.q + MAIN_DRAWOBJ_PLANEFIT*4},
+	{.name = "normal",     .address = "tcp://:9005", .flag = INTERFACE1_WRITE, .type = GTYPE_VBO_VF32, .mesh = MAIN_DRAWOBJ_NORMAL},
 	{.name = NULL}
 };
 
@@ -295,6 +316,10 @@ int main (int argc, char * argv[])
 						cam.h = h;
 						glViewport (0, 0, w, h);
 					}
+					break;
+
+				case 't':
+					gm.p[MAIN_DRAWOBJ_PLANEFIT*4] += 2.0f;
 					break;
 
 				case 'o':{
@@ -387,6 +412,7 @@ int main (int argc, char * argv[])
 
 		interface1_send (iface);
 		interface1_recv (iface, &gm);
+		//qf32_print (gm.q + MAIN_DRAWOBJ_PLANEFIT * 4, stdout);
 
 
 		gmeshes_draw (&gm, uniform_mvp, cam.mvp);

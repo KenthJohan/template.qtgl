@@ -154,16 +154,33 @@ static void gmeshes_square (struct gmeshes * m, unsigned index)
 	-1.0f,  1.0f, 0.0f, 1.0f
 	};
 	gmeshes_update (m, index, main_glattr_pos, s, 6);
-	float const c[] =
+}
+
+static void gmeshes_color (struct gmeshes * m, unsigned index, float r, float g, float b)
+{
+	GLintptr offset = 0;
+	unsigned n = m->vcap[index];
+	GLsizeiptr length = n * sizeof(float) * 4;
+	float * v;
+	glBindBuffer (GL_ARRAY_BUFFER, m->vboc[index]);
+	v = glMapBufferRange (GL_ARRAY_BUFFER, offset, length, GL_MAP_WRITE_BIT);
+	for (unsigned i = 0; i < n; ++i)
 	{
-	0.0f, 1.0f, 0.0f, 1.0f,
-	0.0f, 1.0f, 0.0f, 1.0f,
-	0.0f, 1.0f, 0.0f, 1.0f,
-	0.0f, 0.0f, 1.0f, 1.0f,
-	0.0f, 0.0f, 1.0f, 1.0f,
-	0.0f, 0.0f, 1.0f, 1.0f
-	};
-	gmeshes_update (m, index, main_glattr_col, c, 6);
+		v[0] = r;
+		v[1] = g;
+		v[2] = b;
+		v[3] = 1.0f;
+		v += 4;
+	}
+	glUnmapBuffer (GL_ARRAY_BUFFER);
+}
+
+
+static void plane_parametric_form (float a, float b, float c, float d, float r, float s, float x[3])
+{
+	x[0] = (d/a) + r * (-b/a) + s * (-c/a);
+	x[1] = r;
+	x[2] = s;
 }
 
 
@@ -173,12 +190,6 @@ static void gmeshes_line (struct gmeshes * m, unsigned index, float a[], float b
 	memcpy(s+0*4, a, sizeof (float) * 4);
 	memcpy(s+1*4, b, sizeof (float) * 4);
 	gmeshes_update (m, index, main_glattr_pos, s, 2);
-	float const c[] =
-	{
-	1.0f, 1.0f, 1.0f, 1.0f,
-	1.0f, 1.0f, 1.0f, 1.0f
-	};
-	gmeshes_update (m, index, main_glattr_col, c, 2);
 }
 
 
@@ -196,18 +207,6 @@ static void gmeshes_points (struct gmeshes * m, unsigned index)
 		v[0] = (float)rand() / (float)RAND_MAX;
 		v[1] = (float)rand() / (float)RAND_MAX;
 		v[2] = (float)rand() / (float)RAND_MAX;
-		v[3] = 1.0f;
-		v += 4;
-	}
-	glUnmapBuffer (GL_ARRAY_BUFFER);
-
-	glBindBuffer (GL_ARRAY_BUFFER, m->vboc[index]);
-	v = glMapBufferRange (GL_ARRAY_BUFFER, offset, length, GL_MAP_WRITE_BIT);
-	for (unsigned i = 0; i < n; ++i)
-	{
-		v[0] = 1.0f;
-		v[1] = 1.0f;
-		v[2] = 1.0f;
 		v[3] = 1.0f;
 		v += 4;
 	}
