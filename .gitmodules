@@ -7,3 +7,6 @@
 [submodule "shape/nng"]
 	path = shape/nng
 	url = https://github.com/nanomsg/nng
+[submodule "texture/csc"]
+	path = texture/csc
+	url = https://github.com/KenthJohan/csc

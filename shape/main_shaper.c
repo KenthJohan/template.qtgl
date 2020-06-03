@@ -212,22 +212,25 @@ int main (int argc, char * argv[])
 	glDebugMessageControl (GL_DONT_CARE, GL_DONT_CARE, GL_DONT_CARE, 0, NULL, GL_FALSE);//Disable all messages
 	glDebugMessageControl (GL_DEBUG_SOURCE_API, GL_DEBUG_TYPE_ERROR, GL_DONT_CARE, 0, NULL, GL_TRUE);//Enable error messages
 
+	/*
 	glEnable (GL_DEPTH_TEST);
 	glEnable (GL_PROGRAM_POINT_SIZE_EXT);
 	glEnable (GL_VERTEX_PROGRAM_POINT_SIZE);
 	glEnable (GL_TEXTURE_2D);
 	glPointSize (50.0f);
 	glLineWidth (20.0f);
+	*/
 
 	char const * shaderfiles[] = {"../shape/shader.glvs", "../shape/shader.glfs", NULL};
 	char const * shaderfiles2[] = {"../shape/shader2.glvs", "../shape/shader2.glfs", NULL};
 	GLuint shader_program = csc_gl_program_from_files (shaderfiles);
-	GLuint shader_program2 = csc_gl_program_from_files (shaderfiles2);
 	glBindAttribLocation (shader_program, main_glattr_pos, "pos" );
 	glBindAttribLocation (shader_program, main_glattr_col, "col" );
+	GLuint shader_program2 = csc_gl_program_from_files (shaderfiles2);
 	glBindAttribLocation (shader_program2, main_glattr_pos, "pos" );
 	glBindAttribLocation (shader_program2, main_glattr_col, "col" );
 	glBindAttribLocation (shader_program2, main_glattr_tex, "tex" );
+
 	glLinkProgram (shader_program);
 	glLinkProgram (shader_program2);
 

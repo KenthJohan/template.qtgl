@@ -39,7 +39,7 @@ static void gtextures_allocate (struct gtextures * t, unsigned index, GLsizei wi
 	data = malloc (size);
 	for (unsigned i = 0; i < size; ++i)
 	{
-		data[i] = 255;
+		data[i] = rand();
 	}
 	glTexImage2D (GL_TEXTURE_2D, 0, GL_RGBA, width, height, 0, GL_RGBA, GL_UNSIGNED_BYTE, data);
 	glGenerateMipmap (GL_TEXTURE_2D);
