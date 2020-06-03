@@ -1,7 +1,5 @@
 #include "csc/csc_crossos.h"
 
-
-#define NNG_STATIC_LIB
 #include <nng/nng.h>
 #include <nng/protocol/pubsub0/pub.h>
 #include <nng/protocol/pubsub0/sub.h>
@@ -217,44 +215,69 @@ int main (int argc, char * argv[])
 	glEnable (GL_DEPTH_TEST);
 	glEnable (GL_PROGRAM_POINT_SIZE_EXT);
 	glEnable (GL_VERTEX_PROGRAM_POINT_SIZE);
-	glPointSize (10.0f);
+	glEnable (GL_TEXTURE_2D);
+	glPointSize (50.0f);
 	glLineWidth (20.0f);
 
 	char const * shaderfiles[] = {"../shape/shader.glvs", "../shape/shader.glfs", NULL};
+	char const * shaderfiles2[] = {"../shape/shader2.glvs", "../shape/shader2.glfs", NULL};
 	GLuint shader_program = csc_gl_program_from_files (shaderfiles);
+	GLuint shader_program2 = csc_gl_program_from_files (shaderfiles2);
 	glBindAttribLocation (shader_program, main_glattr_pos, "pos" );
 	glBindAttribLocation (shader_program, main_glattr_col, "col" );
+	glBindAttribLocation (shader_program2, main_glattr_pos, "pos" );
+	glBindAttribLocation (shader_program2, main_glattr_col, "col" );
+	glBindAttribLocation (shader_program2, main_glattr_tex, "tex" );
 	glLinkProgram (shader_program);
-	glUseProgram (shader_program);
+	glLinkProgram (shader_program2);
+
+	glUseProgram (shader_program2);
+	glUniform1i (glGetUniformLocation (shader_program2, "texture1"), 0);
 
 
+	struct gtextures tx;
+	gtextures_init (&tx, 1);
+	gtextures_allocate (&tx, 0, 100, 100);
 
 	struct gmeshes gm;
 	gmeshes_init (&gm, 100);
+
+	gm.flags[MAIN_DRAWOBJ_SQUARE1]    |= MESH_POSITIONED | MESH_COLORED;
+	gm.flags[MAIN_DRAWOBJ_SQUARE2]    |= MESH_POSITIONED | MESH_COLORED;
+	gm.flags[MAIN_DRAWOBJ_MOUSELINE]  |= MESH_POSITIONED | MESH_COLORED;
+	gm.flags[MAIN_DRAWOBJ_POINTCLOUD] |= MESH_POSITIONED | MESH_COLORED | MESH_SHOW;
+	gm.flags[MAIN_DRAWOBJ_PLANEFIT]   |= MESH_POSITIONED | MESH_COLORED | MESH_TEXTURED | MESH_SHOW;
+	gm.flags[MAIN_DRAWOBJ_NORMAL]     |= MESH_POSITIONED | MESH_COLORED;
+
+	gm.program[MAIN_DRAWOBJ_SQUARE1] = shader_program;
+	gm.program[MAIN_DRAWOBJ_SQUARE2] = shader_program;
+	gm.program[MAIN_DRAWOBJ_MOUSELINE] = shader_program;
+	gm.program[MAIN_DRAWOBJ_POINTCLOUD] = shader_program;
+	gm.program[MAIN_DRAWOBJ_PLANEFIT] = shader_program2;
+	gm.program[MAIN_DRAWOBJ_NORMAL] = shader_program;
+
+	gm.textures[MAIN_DRAWOBJ_PLANEFIT] = 0;
+
 	gmeshes_allocate (&gm, MAIN_DRAWOBJ_SQUARE1, 6, GL_TRIANGLES);
 	gmeshes_allocate (&gm, MAIN_DRAWOBJ_SQUARE2, 6, GL_TRIANGLES);
 	gmeshes_allocate (&gm, MAIN_DRAWOBJ_MOUSELINE, 2, GL_LINES);
 	gmeshes_allocate (&gm, MAIN_DRAWOBJ_POINTCLOUD, 320*20, GL_POINTS);
 	gmeshes_allocate (&gm, MAIN_DRAWOBJ_PLANEFIT, 6, GL_TRIANGLES);
-	gmeshes_allocate (&gm, MAIN_DRAWOBJ_NORMAL, 6, GL_LINES);
+	gmeshes_allocate (&gm, MAIN_DRAWOBJ_NORMAL, 12, GL_LINES);
 
 	gmeshes_color (&gm, MAIN_DRAWOBJ_SQUARE1, 1.0f, 0.0f, 0.0f);
 	gmeshes_color (&gm, MAIN_DRAWOBJ_SQUARE2, 1.0f, 0.0f, 0.0f);
 	gmeshes_color (&gm, MAIN_DRAWOBJ_MOUSELINE, 1.0f, 0.0f, 0.0f);
 	gmeshes_color (&gm, MAIN_DRAWOBJ_POINTCLOUD, 1.0f, 1.0f, 1.0f);
 	gmeshes_color (&gm, MAIN_DRAWOBJ_PLANEFIT, 1.0f, 1.0f, 0.0f);
-	gmeshes_color (&gm, MAIN_DRAWOBJ_NORMAL, 1.0f, 0.0f, 1.0f);
+	gmeshes_color (&gm, MAIN_DRAWOBJ_NORMAL, 0.5f, 0.5f, 1.0f);
+	gmeshes_color1 (&gm, MAIN_DRAWOBJ_NORMAL, 6, 4, 1.0f, 0.0f, 0.0f);
+
 
 	gmeshes_square (&gm, MAIN_DRAWOBJ_SQUARE1);
 	gmeshes_square (&gm, MAIN_DRAWOBJ_SQUARE2);
 	gmeshes_points (&gm, MAIN_DRAWOBJ_POINTCLOUD);
 	gmeshes_square (&gm, MAIN_DRAWOBJ_PLANEFIT);
-
-	gm.flags[MAIN_DRAWOBJ_SQUARE1] &= ~MESH_SHOW;
-	gm.flags[MAIN_DRAWOBJ_SQUARE2] &= ~MESH_SHOW;
-	gm.flags[MAIN_DRAWOBJ_POINTCLOUD] |= MESH_SHOW;
-	gm.flags[MAIN_DRAWOBJ_PLANEFIT] |= MESH_SHOW;
-	gm.flags[MAIN_DRAWOBJ_NORMAL] |= MESH_SHOW;
 
 	GLuint uniform_mvp = glGetUniformLocation (shader_program, "mvp");
 	struct csc_sdlcam cam;

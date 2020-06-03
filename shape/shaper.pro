@@ -3,11 +3,11 @@ CONFIG += console
 CONFIG -= app_bundle
 CONFIG -= qt
 
-
+DEFINES += NNG_STATIC_LIB
 
 QMAKE_CFLAGS += -Wno-unused-function
 
-SOURCES += main.c
+SOURCES += main_shaper.c
 
 HEADERS += csc/csc_sdlcam.h
 HEADERS += csc/csc_math.h
