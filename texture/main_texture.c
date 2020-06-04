@@ -103,39 +103,62 @@ int main (int argc, char * argv[])
 
 
 
-	float vertices[] = {
-	// positions          // colors           // texture coords
-	0.5f,  0.5f, 0.0f, 1.0f,   1.0f, 0.0f, 0.0f, 1.0f,   1.0f, 1.0f, // top right
-	0.5f, -0.5f, 0.0f, 1.0f,   0.0f, 1.0f, 0.0f, 1.0f,   1.0f, 0.0f, // bottom right
-	-0.5f, -0.5f, 0.0f, 1.0f,   0.0f, 0.0f, 1.0f, 1.0f,   0.0f, 0.0f, // bottom left
-	-0.5f,  0.5f, 0.0f, 1.0f,   1.0f, 1.0f, 0.0f, 1.0f,   0.0f, 1.0f  // top left
+	float const p[] =
+	{
+	-1.0f, -1.0f, 0.0f, 1.0f, // left, bottom
+	 1.0f, -1.0f, 0.0f, 1.0f, // right, bottom
+	 1.0f,  1.0f, 0.0f, 1.0f, // right, top
+	-1.0f, -1.0f, 0.0f, 1.0f, // left, bottom
+	 1.0f,  1.0f, 0.0f, 1.0f, // right, top
+	-1.0f,  1.0f, 0.0f, 1.0f  // left, top
 	};
-	unsigned int indices[] = {
-	0, 1, 3, // first triangle
-	1, 2, 3  // second triangle
+	float const c[] =
+	{
+	1.0f, 1.0f, 1.0f, 1.0f, // left, bottom
+	1.0f, 1.0f, 1.0f, 1.0f, // right, bottom
+	1.0f, 1.0f, 1.0f, 1.0f, // right, top
+	1.0f, 1.0f, 1.0f, 1.0f, // left, bottom
+	1.0f, 1.0f, 1.0f, 1.0f, // right, top
+	1.0f, 1.0f, 1.0f, 1.0f  // left, top
 	};
-	unsigned int VBO, VAO, EBO;
+	float const t[] =
+	{
+	0.0f, 0.0f, // left, bottom
+	1.0f, 0.0f, // right, bottom
+	1.0f, 1.0f, // right, top
+	0.0f, 0.0f, // left, bottom
+	1.0f, 1.0f, // right, top
+	0.0f, 1.0f  // left, top
+	};
+
+
+	unsigned int VBOp;
+	unsigned int VBOc;
+	unsigned int VBOt;
+	unsigned int VAO;
+
 	glGenVertexArrays(1, &VAO);
-	glGenBuffers(1, &VBO);
-	glGenBuffers(1, &EBO);
+	glGenBuffers(1, &VBOp);
+	glGenBuffers(1, &VBOc);
+	glGenBuffers(1, &VBOt);
 
 	glBindVertexArray(VAO);
 
-	glBindBuffer(GL_ARRAY_BUFFER, VBO);
-	glBufferData(GL_ARRAY_BUFFER, sizeof(vertices), vertices, GL_STATIC_DRAW);
 
-	glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, EBO);
-	glBufferData(GL_ELEMENT_ARRAY_BUFFER, sizeof(indices), indices, GL_STATIC_DRAW);
+	glBindBuffer(GL_ARRAY_BUFFER, VBOp);
+	glBufferData(GL_ARRAY_BUFFER, sizeof(p), p, GL_STATIC_DRAW);
+	glVertexAttribPointer (main_glattr_pos, 4, GL_FLOAT, GL_FALSE, 0, (void*)0);
+	glEnableVertexAttribArray (main_glattr_pos);
 
-	// position attribute
-	glVertexAttribPointer(main_glattr_pos, 4, GL_FLOAT, GL_FALSE, 10 * sizeof(float), (void*)0);
-	glEnableVertexAttribArray(main_glattr_pos);
-	// color attribute
-	glVertexAttribPointer(main_glattr_col, 4, GL_FLOAT, GL_FALSE, 10 * sizeof(float), (void*)(4 * sizeof(float)));
-	glEnableVertexAttribArray(main_glattr_col);
-	// texture coord attribute
-	glVertexAttribPointer(main_glattr_tex, 2, GL_FLOAT, GL_FALSE, 10 * sizeof(float), (void*)(8 * sizeof(float)));
-	glEnableVertexAttribArray(main_glattr_tex);
+	glBindBuffer(GL_ARRAY_BUFFER, VBOc);
+	glBufferData(GL_ARRAY_BUFFER, sizeof(c), c, GL_STATIC_DRAW);
+	glVertexAttribPointer (main_glattr_col, 4, GL_FLOAT, GL_FALSE, 0, (void*)0);
+	glEnableVertexAttribArray (main_glattr_col);
+
+	glBindBuffer(GL_ARRAY_BUFFER, VBOt);
+	glBufferData(GL_ARRAY_BUFFER, sizeof(t), t, GL_STATIC_DRAW);
+	glVertexAttribPointer (main_glattr_tex, 2, GL_FLOAT, GL_FALSE, 0, (void*)0);
+	glEnableVertexAttribArray (main_glattr_tex);
 
 	unsigned int texture1;
 	glGenTextures(1, &texture1);
@@ -161,6 +184,10 @@ int main (int argc, char * argv[])
 		glGenerateMipmap(GL_TEXTURE_2D);
 	}
 
+	GLuint uniform_mvp = glGetUniformLocation (shader_program, "mvp");
+	struct csc_sdlcam cam;
+	csc_sdlcam_init (&cam);
+
 	const Uint8 * keyboard = SDL_GetKeyboardState (NULL);
 	while (main_flags & MAIN_RUNNING)
 	{
@@ -177,14 +204,28 @@ int main (int argc, char * argv[])
 		}
 
 
+		{
+			//Camera:
+			cam.d [0] = 0.1f*(keyboard [SDL_SCANCODE_A] - keyboard [SDL_SCANCODE_D]);
+			cam.d [1] = 0.1f*(keyboard [SDL_SCANCODE_LCTRL] - keyboard [SDL_SCANCODE_SPACE]);
+			cam.d [2] = 0.1f*(keyboard [SDL_SCANCODE_W] - keyboard [SDL_SCANCODE_S]);
+			cam.d [3] = 0;
+			cam.pitchd = 0.01f * (keyboard [SDL_SCANCODE_DOWN] - keyboard [SDL_SCANCODE_UP]);
+			cam.yawd = 0.01f * (keyboard [SDL_SCANCODE_RIGHT] - keyboard [SDL_SCANCODE_LEFT]);
+			cam.rolld = 0.01f * (keyboard [SDL_SCANCODE_Q] - keyboard [SDL_SCANCODE_E]);
+			csc_sdlcam_build (&cam);
+		}
+
+
 		glClearColor(0.2f, 0.3f, 0.3f, 1.0f);
-		glClear(GL_COLOR_BUFFER_BIT);
+		glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
 		glUseProgram (shader_program);
 		glActiveTexture(GL_TEXTURE0);
 		glBindTexture(GL_TEXTURE_2D, texture1);
+		glUniformMatrix4fv (uniform_mvp, 1, GL_FALSE, (const GLfloat *) cam.mvp);
 		glBindVertexArray(VAO);
-		glDrawElements(GL_TRIANGLES, 6, GL_UNSIGNED_INT, 0);
+		glDrawArrays (GL_TRIANGLES, 0, 6);
 
 		SDL_Delay (10);
 		SDL_GL_SwapWindow (window);

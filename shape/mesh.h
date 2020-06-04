@@ -170,7 +170,7 @@ static void gmeshes_draw (struct gmeshes * m, GLuint uniform_mvp, float mvp[4*4]
 {
 	ASSERT_PARAM_NOTNULL (m);
 	glClearColor (0.1f, 0.1f, 0.1f, 0.0f);
-	glClear (GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT | GL_COLOR_BUFFER_BIT);
+	glClear (GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 	for (unsigned i = 0; i < m->cap; ++i)
 	{
 		GLuint vao = m->vao[i];//Mesh Vertex array object
