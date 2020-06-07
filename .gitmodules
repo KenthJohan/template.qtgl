@@ -10,3 +10,6 @@
 [submodule "texture/csc"]
 	path = texture/csc
 	url = https://github.com/KenthJohan/csc
+[submodule "demo1/csc"]
+	path = demo1/csc
+	url = https://github.com/KenthJohan/csc
