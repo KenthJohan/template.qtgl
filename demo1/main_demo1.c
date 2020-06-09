@@ -33,6 +33,13 @@
 #define TEX_H 100
 
 
+#define VOX_XN 50
+#define VOX_YN 20
+#define VOX_ZN 10
+#define VOX_I(x,y,z) ((z)*VOX_XN*VOX_YN + (y)*VOX_XN + (x))
+#define VOX_SCALE 0.1f
+
+
 enum main_glprogram
 {
 	MAIN_GLPROGRAM_STARNDARD,
@@ -59,6 +66,7 @@ enum main_nngsock
 	MAIN_NNGSOCK_POINTCLOUD,
 	MAIN_NNGSOCK_PLANE,
 	MAIN_NNGSOCK_TEX,
+	MAIN_NNGSOCK_VOXEL,
 	MAIN_NNGSOCK_COUNT
 };
 
@@ -181,17 +189,33 @@ int main (int argc, char * argv[])
 
 
 	struct mesh_voxel mvoxel = {0};
-	mvoxel.cap = 2;
+	mvoxel.cap = VOX_XN*VOX_YN*VOX_ZN;
 	mvoxel.uniform_mvp = glGetUniformLocation (gprogram[MAIN_GLPROGRAM_VOXEL], "mvp");
 	mvoxel.program = gprogram[MAIN_GLPROGRAM_VOXEL];
 	mesh_voxel_init (&mvoxel);
 
+	uint8_t voxel[VOX_XN*VOX_YN*VOX_ZN] = {0};
+	voxel[VOX_I(0,0,0)] = 1;
+	voxel[VOX_I(0,0,1)] = 2;
+	voxel[VOX_I(0,0,2)] = 3;
+	voxel[VOX_I(0,0,3)] = 44;
+	voxel[VOX_I(49,0,0)] = 54;
+	voxel[VOX_I(49,19,0)] = 54;
+	voxel[VOX_I(49,19,2)] = 44;
+	voxel[VOX_I(49,19,9)] = 1;
+	voxel[VOX_I(49,19,8)] = 200;
+	voxel[VOX_I(49,19,7)] = 255;
+	mesh_voxel_update (&mvoxel, voxel, VOX_XN, VOX_YN, VOX_ZN);
+	m4f32_scale (mvoxel.model, VOX_SCALE);
+	m4f32_translation_xyz (mvoxel.model, 0.0f*VOX_SCALE - VOX_SCALE/2, -(VOX_YN/2)*VOX_SCALE - VOX_SCALE/2, -(VOX_ZN/2)*VOX_SCALE - VOX_SCALE/2);
 
-	/*
+
+
 	pair_listen (sock + MAIN_NNGSOCK_POINTCLOUD, "tcp://:9002");
-	pair_listen (sock + MAIN_NNGSOCK_PLANE, "tcp://:9003");
-	pair_listen (sock + MAIN_NNGSOCK_TEX, "tcp://:9004");
-	*/
+	//pair_listen (sock + MAIN_NNGSOCK_PLANE, "tcp://:9003");
+	//pair_listen (sock + MAIN_NNGSOCK_TEX, "tcp://:9004");
+	pair_listen (sock + MAIN_NNGSOCK_VOXEL, "tcp://:9005");
+
 
 
 	struct csc_sdlcam cam;
@@ -293,10 +317,10 @@ int main (int argc, char * argv[])
 
 
 
-		//net_recv (sock[MAIN_NNGSOCK_POINTCLOUD], GL_ARRAY_BUFFER, mpointcloud.vbop, mpointcloud.cap, 0);
+		net_recv (sock[MAIN_NNGSOCK_POINTCLOUD], GL_ARRAY_BUFFER, mpointcloud.vbop, mpointcloud.cap, 0);
 		//net_recv (sock[MAIN_NNGSOCK_PLANE], GL_ARRAY_BUFFER, mrectangletex.vbop, mrectangletex.cap, 0);
 		//net_recv (sock[MAIN_NNGSOCK_TEX], GL_PIXEL_UNPACK_BUFFER, pbo[MAIN_GLPBO_0], TEX_W*TEX_H*4, NET_RECV_DISCARD);
-
+		mesh_voxel_update_from_socket (&mvoxel, VOX_XN, VOX_YN, VOX_ZN, sock[MAIN_NNGSOCK_VOXEL]);
 
 
 		SDL_Delay (10);

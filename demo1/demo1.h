@@ -191,11 +191,13 @@ static void mesh_rectangle_draw (struct mesh_rectangle * m, float * mvp)
 struct mesh_voxel
 {
 	unsigned cap;
+	unsigned last;
 	GLuint vao;
 	GLuint vbop;
 	GLuint vbob;
 	GLuint program;
 	GLuint uniform_mvp;
+	float model[4*4];
 };
 
 #define byte4(a,b,c,d) (((a) << 0) | ((b) << 8) | ((c) << 16) | ((d) << 24))
@@ -260,39 +262,93 @@ static void mesh_voxel_barycentric (uint32_t v[MESH_VOXEL_COUNT])
 
 static void mesh_voxel_init (struct mesh_voxel * m)
 {
+	m4f32_identity (m->model);
 	glGenVertexArrays(1, &m->vao);
 	glGenBuffers(1, &m->vbop);
 	glGenBuffers(1, &m->vbob);
-
-	uint32_t v[MESH_VOXEL_COUNT*2] = {0};
-
 	glBindVertexArray (m->vao);
 
-	mesh_voxe_cube (v+0*MESH_VOXEL_COUNT, 1, 1, 2, 50);
-	mesh_voxe_cube (v+1*MESH_VOXEL_COUNT, 2, 1, 1, 100);
 	glBindBuffer (GL_ARRAY_BUFFER, m->vbop);
-	glBufferData (GL_ARRAY_BUFFER, m->cap*MESH_VOXEL_COUNT*sizeof(uint32_t), v, GL_STATIC_DRAW);
-	glVertexAttribPointer (0, 4, GL_BYTE, GL_FALSE, 0, (void*)0);
+	glBufferData (GL_ARRAY_BUFFER, m->cap*MESH_VOXEL_COUNT*sizeof(uint32_t), NULL, GL_STATIC_DRAW);
+	glVertexAttribPointer (0, 4,  GL_UNSIGNED_BYTE, GL_FALSE, 0, (void*)0);
 	glEnableVertexAttribArray (0);
 
-	mesh_voxel_barycentric (v+0*MESH_VOXEL_COUNT);
-	mesh_voxel_barycentric (v+1*MESH_VOXEL_COUNT);
 	glBindBuffer (GL_ARRAY_BUFFER, m->vbob);
-	glBufferData (GL_ARRAY_BUFFER, m->cap*MESH_VOXEL_COUNT*sizeof(uint32_t), v, GL_STATIC_DRAW);
-	glVertexAttribPointer (1, 4, GL_BYTE, GL_FALSE, 0, (void*)0);
+	glBufferData (GL_ARRAY_BUFFER, m->cap*MESH_VOXEL_COUNT*sizeof(uint32_t), NULL, GL_DYNAMIC_DRAW);
+	glVertexAttribPointer (1, 4,  GL_UNSIGNED_BYTE, GL_FALSE, 0, (void*)0);
 	glEnableVertexAttribArray (1);
+	GLsizeiptr length = m->cap*MESH_VOXEL_COUNT*sizeof(uint32_t);
+	uint32_t * v = glMapBufferRange (GL_ARRAY_BUFFER, 0, length, GL_MAP_WRITE_BIT);
+	if (v)
+	{
+		for (int i = 0; i < m->cap; ++i)
+		{
+			mesh_voxel_barycentric (v);
+			v += MESH_VOXEL_COUNT;
+		}
+		glUnmapBuffer (GL_ARRAY_BUFFER);
+	}
 }
 
 
-static void mesh_voxel_draw (struct mesh_voxel * m, float * mvp)
+static void mesh_voxel_draw (struct mesh_voxel * m, float mvp[4*4])
 {
 	glUseProgram (m->program);
-	glUniformMatrix4fv (m->uniform_mvp, 1, GL_FALSE, (const GLfloat *) mvp);
+	float mmvp[4*4];
+	m4f32_mul (mmvp, mvp, m->model);
+	glUniformMatrix4fv (m->uniform_mvp, 1, GL_FALSE, (const GLfloat *) mmvp);
 	glBindVertexArray (m->vao);
-	glDrawArrays (GL_TRIANGLES, 0, m->cap*MESH_VOXEL_COUNT);
+	glDrawArrays (GL_TRIANGLES, 0, m->last*MESH_VOXEL_COUNT);
 }
 
 
+static void mesh_voxel_update (struct mesh_voxel * m, uint8_t vox[], uint8_t nx, uint8_t ny, uint8_t nz)
+{
+	glBindBuffer (GL_ARRAY_BUFFER, m->vbop);
+	GLsizeiptr length = m->cap*MESH_VOXEL_COUNT*sizeof(uint32_t);
+	uint32_t * v = glMapBufferRange (GL_ARRAY_BUFFER, 0, length, GL_MAP_WRITE_BIT);
+	m->last = 0;
+	if (v)
+	{
+		for (uint8_t x = 0; x < nx; ++x)
+		{
+			for (uint8_t y = 0; y < ny; ++y)
+			{
+				for (uint8_t z = 0; z < nz; ++z)
+				{
+					uint8_t type = vox[z*nx*ny + y*nx + x];
+					if (type)
+					{
+						mesh_voxe_cube (v, x, y, z, type);
+						v += MESH_VOXEL_COUNT;
+						m->last++;
+					}
+				}
+			}
+		}
+		glUnmapBuffer (GL_ARRAY_BUFFER);
+	}
+}
+
+
+static void mesh_voxel_update_from_socket (struct mesh_voxel * m, uint8_t nx, uint8_t ny, uint8_t nz, nng_socket sock)
+{
+	int rv;
+	size_t sz;
+	uint8_t * val = NULL;
+	rv = nng_recv (sock, &val, &sz, NNG_FLAG_ALLOC | NNG_FLAG_NONBLOCK);
+	if (rv == NNG_EAGAIN)
+	{
+		return;
+	}
+	else if (rv != 0)
+	{
+		NNG_EXIT_ON_ERROR (rv);
+	}
+	ASSERT (sz == nx*ny*nz);
+	mesh_voxel_update (m, val, nx, ny, nz);
+	nng_free (val, sz);
+}
 
 
 
@@ -350,6 +406,8 @@ void net_recv (nng_socket sock, GLenum target, GLuint vbo, unsigned cap, int fla
 	}
 	nng_free (val, sz);
 }
+
+
 
 
 
