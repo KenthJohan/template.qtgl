@@ -1,0 +1,20 @@
+#version 330 core
+
+varying vec4 texcoord;
+in vec3 vbc;
+
+const float lineWidth = 0.5f;
+const vec3 lineColor = vec3(0.7, 0.7, 0.7);
+
+float edgeFactor()
+{
+	vec3 d = fwidth(vbc);
+	vec3 f = step(d * lineWidth, vbc);
+	return min(min(f.x, f.y), f.z);
+}
+
+void main()
+{
+	vec3 color = vec3(texcoord.w / 128.0, texcoord.w / 256.0, texcoord.w / 512.0);
+	gl_FragColor = vec4(min(vec3(edgeFactor()), color), 1.0);
+}

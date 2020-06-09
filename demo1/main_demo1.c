@@ -37,6 +37,7 @@ enum main_glprogram
 {
 	MAIN_GLPROGRAM_STARNDARD,
 	MAIN_GLPROGRAM_POINTCLOUD,
+	MAIN_GLPROGRAM_VOXEL,
 	MAIN_GLPROGRAM_COUNT
 };
 
@@ -57,6 +58,7 @@ enum main_nngsock
 {
 	MAIN_NNGSOCK_POINTCLOUD,
 	MAIN_NNGSOCK_PLANE,
+	MAIN_NNGSOCK_TEX,
 	MAIN_NNGSOCK_COUNT
 };
 
@@ -144,6 +146,13 @@ int main (int argc, char * argv[])
 	glLinkProgram (gprogram[MAIN_GLPROGRAM_STARNDARD]);
 
 
+	char const * shaderfiles3[] = {"../demo1/voxel.glvs", "../demo1/voxel.glfs", NULL};
+	gprogram[MAIN_GLPROGRAM_VOXEL] = csc_gl_program_from_files (shaderfiles3);
+	glBindAttribLocation (gprogram[MAIN_GLPROGRAM_VOXEL], main_glattr_pos, "pos" );
+	glLinkProgram (gprogram[MAIN_GLPROGRAM_VOXEL]);
+
+
+
 	glGenTextures (MAIN_GLTEX_COUNT, gtexture);
 	glBindTexture (GL_TEXTURE_2D, gtexture[MAIN_GLTEX_0]);
 	glTexParameteri (GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_REPEAT);
@@ -155,24 +164,34 @@ int main (int argc, char * argv[])
 
 
 
-	struct mesh_rectangle meshr = {0};
-	meshr.cap = 6;
-	meshr.uniform_mvp = glGetUniformLocation (gprogram[MAIN_GLPROGRAM_STARNDARD], "mvp");
-	meshr.program = gprogram[MAIN_GLPROGRAM_STARNDARD];
-	meshr.texture = gtexture[MAIN_GLTEX_0];
-	mesh_rectangle_init (&meshr);
+	struct mesh_rectangle mrectangletex = {0};
+	mrectangletex.cap = 6;
+	mrectangletex.uniform_mvp = glGetUniformLocation (gprogram[MAIN_GLPROGRAM_STARNDARD], "mvp");
+	mrectangletex.program = gprogram[MAIN_GLPROGRAM_STARNDARD];
+	mrectangletex.texture = gtexture[MAIN_GLTEX_0];
+	mesh_rectangle_init (&mrectangletex);
 
 
 
-	struct mesh_pointcloud meshpc = {0};
-	meshpc.cap = POINTC_W*POINTC_H;
-	meshpc.uniform_mvp = glGetUniformLocation (gprogram[MAIN_GLPROGRAM_POINTCLOUD], "mvp");
-	meshpc.program = gprogram[MAIN_GLPROGRAM_POINTCLOUD];
-	mesh_pointcloud_init (&meshpc);
+	struct mesh_pointcloud mpointcloud = {0};
+	mpointcloud.cap = POINTC_W*POINTC_H;
+	mpointcloud.uniform_mvp = glGetUniformLocation (gprogram[MAIN_GLPROGRAM_POINTCLOUD], "mvp");
+	mpointcloud.program = gprogram[MAIN_GLPROGRAM_POINTCLOUD];
+	mesh_pointcloud_init (&mpointcloud);
 
 
+	struct mesh_voxel mvoxel = {0};
+	mvoxel.cap = 2;
+	mvoxel.uniform_mvp = glGetUniformLocation (gprogram[MAIN_GLPROGRAM_VOXEL], "mvp");
+	mvoxel.program = gprogram[MAIN_GLPROGRAM_VOXEL];
+	mesh_voxel_init (&mvoxel);
+
+
+	/*
 	pair_listen (sock + MAIN_NNGSOCK_POINTCLOUD, "tcp://:9002");
 	pair_listen (sock + MAIN_NNGSOCK_PLANE, "tcp://:9003");
+	pair_listen (sock + MAIN_NNGSOCK_TEX, "tcp://:9004");
+	*/
 
 
 	struct csc_sdlcam cam;
@@ -239,17 +258,18 @@ int main (int argc, char * argv[])
 		glClearColor (0.2f, 0.3f, 0.3f, 1.0f);
 		glClear (GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
-		mesh_rectangle_draw (&meshr, cam.mvp);
-		mesh_pointcloud_draw (&meshpc, cam.mvp);
+		mesh_rectangle_draw (&mrectangletex, cam.mvp);
+		mesh_pointcloud_draw (&mpointcloud, cam.mvp);
+		mesh_voxel_draw (&mvoxel, cam.mvp);
 
 
-
+		// copy pixels from PBO to texture object
+		// Use offset instead of ponter
 		glBindTexture (GL_TEXTURE_2D, gtexture[MAIN_GLTEX_0]);
 		glBindBuffer (GL_PIXEL_UNPACK_BUFFER, pbo[MAIN_GLPBO_0]);
 		glTexSubImage2D (GL_TEXTURE_2D, 0, 0, 0, TEX_W, TEX_H, GL_RGBA, GL_UNSIGNED_BYTE, 0);
 
-
-
+		/*
 		glBindBuffer (GL_PIXEL_UNPACK_BUFFER, pbo[MAIN_GLPBO_0]);
 		// map the buffer object into client's memory
 		// Note that glMapBuffer() causes sync issue.
@@ -260,19 +280,22 @@ int main (int argc, char * argv[])
 		// glMapBuffer() returns a new allocated pointer immediately
 		// even if GPU is still working with the previous data.
 		glBufferData (GL_PIXEL_UNPACK_BUFFER, TEX_W*TEX_H*4, 0, GL_STREAM_DRAW);
-		GLubyte* ptr = (GLubyte*)glMapBuffer (GL_PIXEL_UNPACK_BUFFER, GL_WRITE_ONLY);
+		//GLubyte* ptr = (GLubyte*)glMapBuffer (GL_PIXEL_UNPACK_BUFFER, GL_WRITE_ONLY);
+		GLubyte* ptr = (GLubyte*)glMapBufferRange (GL_PIXEL_UNPACK_BUFFER, 0, TEX_W*TEX_H*4, GL_MAP_WRITE_BIT);
 		if(ptr)
 		{
 			// update data directly on the mapped buffer
 			updatePixels (ptr, TEX_W*TEX_H*4, framecounter);
 			glUnmapBuffer (GL_PIXEL_UNPACK_BUFFER);  // release pointer to mapping buffer
 		}
+		*/
 
 
 
 
-		net_recv (sock[MAIN_NNGSOCK_POINTCLOUD], meshpc.vbop, meshpc.cap);
-		net_recv (sock[MAIN_NNGSOCK_PLANE], meshr.vbop, meshr.cap);
+		//net_recv (sock[MAIN_NNGSOCK_POINTCLOUD], GL_ARRAY_BUFFER, mpointcloud.vbop, mpointcloud.cap, 0);
+		//net_recv (sock[MAIN_NNGSOCK_PLANE], GL_ARRAY_BUFFER, mrectangletex.vbop, mrectangletex.cap, 0);
+		//net_recv (sock[MAIN_NNGSOCK_TEX], GL_PIXEL_UNPACK_BUFFER, pbo[MAIN_GLPBO_0], TEX_W*TEX_H*4, NET_RECV_DISCARD);
 
 
 

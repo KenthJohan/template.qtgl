@@ -187,6 +187,128 @@ static void mesh_rectangle_draw (struct mesh_rectangle * m, float * mvp)
 
 
 
+
+struct mesh_voxel
+{
+	unsigned cap;
+	GLuint vao;
+	GLuint vbop;
+	GLuint vbob;
+	GLuint program;
+	GLuint uniform_mvp;
+};
+
+#define byte4(a,b,c,d) (((a) << 0) | ((b) << 8) | ((c) << 16) | ((d) << 24))
+#define MESH_VOXEL_COUNT 36
+
+static void mesh_voxe_cube (uint32_t v[MESH_VOXEL_COUNT], uint8_t x, uint8_t y, uint8_t z, uint8_t type)
+{
+	v[0]  = byte4(x,     y,     z,     type);
+	v[1]  = byte4(x,     y,     z + 1, type);
+	v[2]  = byte4(x,     y + 1, z,     type);
+	v[3]  = byte4(x,     y + 1, z,     type);
+	v[4]  = byte4(x,     y,     z + 1, type);
+	v[5]  = byte4(x,     y + 1, z + 1, type);
+
+	v[6]  = byte4(x + 1, y,     z,     type);
+	v[7]  = byte4(x + 1, y + 1, z,     type);
+	v[8]  = byte4(x + 1, y,     z + 1, type);
+	v[9]  = byte4(x + 1, y + 1, z,     type);
+	v[10] = byte4(x + 1, y + 1, z + 1, type);
+	v[11] = byte4(x + 1, y    , z + 1, type);
+
+	v[12] = byte4(x,     y,     z,     type);
+	v[13] = byte4(x,     y,     z + 1, type);
+	v[14] = byte4(x + 1, y,     z,     type);
+	v[15] = byte4(x + 1, y,     z,     type);
+	v[16] = byte4(x,     y,     z + 1, type);
+	v[17] = byte4(x + 1, y,     z + 1, type);
+
+	v[18] = byte4(x,     y + 1, z,     type);
+	v[19] = byte4(x + 1, y + 1, z,     type);
+	v[20] = byte4(x,     y + 1, z + 1, type);
+	v[21] = byte4(x + 1, y + 1, z,     type);
+	v[22] = byte4(x + 1, y + 1, z + 1, type);
+	v[23] = byte4(x,     y + 1, z + 1, type);
+
+	v[24] = byte4(x,     y,     z,     type);
+	v[25] = byte4(x,     y + 1, z,     type);
+	v[26] = byte4(x + 1, y,     z,     type);
+	v[27] = byte4(x + 1, y,     z,     type);
+	v[28] = byte4(x,     y + 1, z,     type);
+	v[29] = byte4(x + 1, y + 1, z,     type);
+
+	v[30] = byte4(x,     y,     z + 1, type);
+	v[31] = byte4(x + 1, y,     z + 1, type);
+	v[32] = byte4(x,     y + 1, z + 1, type);
+	v[33] = byte4(x + 1, y,     z + 1, type);
+	v[34] = byte4(x + 1, y + 1, z + 1, type);
+	v[35] = byte4(x,     y + 1, z + 1, type);
+}
+
+
+static void mesh_voxel_barycentric (uint32_t v[MESH_VOXEL_COUNT])
+{
+	for (int i = 0; i < 12; ++i)
+	{
+		v[0]  = byte4(1, 0, 0, 0);
+		v[1]  = byte4(0, 1, 0, 0);
+		v[2]  = byte4(0, 0, 1, 0);
+		v += 3;
+	}
+}
+
+static void mesh_voxel_init (struct mesh_voxel * m)
+{
+	glGenVertexArrays(1, &m->vao);
+	glGenBuffers(1, &m->vbop);
+	glGenBuffers(1, &m->vbob);
+
+	uint32_t v[MESH_VOXEL_COUNT*2] = {0};
+
+	glBindVertexArray (m->vao);
+
+	mesh_voxe_cube (v+0*MESH_VOXEL_COUNT, 1, 1, 2, 50);
+	mesh_voxe_cube (v+1*MESH_VOXEL_COUNT, 2, 1, 1, 100);
+	glBindBuffer (GL_ARRAY_BUFFER, m->vbop);
+	glBufferData (GL_ARRAY_BUFFER, m->cap*MESH_VOXEL_COUNT*sizeof(uint32_t), v, GL_STATIC_DRAW);
+	glVertexAttribPointer (0, 4, GL_BYTE, GL_FALSE, 0, (void*)0);
+	glEnableVertexAttribArray (0);
+
+	mesh_voxel_barycentric (v+0*MESH_VOXEL_COUNT);
+	mesh_voxel_barycentric (v+1*MESH_VOXEL_COUNT);
+	glBindBuffer (GL_ARRAY_BUFFER, m->vbob);
+	glBufferData (GL_ARRAY_BUFFER, m->cap*MESH_VOXEL_COUNT*sizeof(uint32_t), v, GL_STATIC_DRAW);
+	glVertexAttribPointer (1, 4, GL_BYTE, GL_FALSE, 0, (void*)0);
+	glEnableVertexAttribArray (1);
+}
+
+
+static void mesh_voxel_draw (struct mesh_voxel * m, float * mvp)
+{
+	glUseProgram (m->program);
+	glUniformMatrix4fv (m->uniform_mvp, 1, GL_FALSE, (const GLfloat *) mvp);
+	glBindVertexArray (m->vao);
+	glDrawArrays (GL_TRIANGLES, 0, m->cap*MESH_VOXEL_COUNT);
+}
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 void pair_listen (nng_socket * sock, char const * address)
 {
 	int r;
@@ -197,8 +319,9 @@ void pair_listen (nng_socket * sock, char const * address)
 }
 
 
+#define NET_RECV_DISCARD 0x01
 
-void net_recv (nng_socket sock, GLuint vbo, unsigned cap)
+void net_recv (nng_socket sock, GLenum target, GLuint vbo, unsigned cap, int flag)
 {
 	int rv;
 	size_t sz;
@@ -213,11 +336,21 @@ void net_recv (nng_socket sock, GLuint vbo, unsigned cap)
 		NNG_EXIT_ON_ERROR (rv);
 	}
 	//printf ("New message %i\n", sz);
-	glBindBuffer (GL_ARRAY_BUFFER, vbo);
+	glBindBuffer (target, vbo);
 	GLsizeiptr length = MIN (cap * sizeof(float) * 4, sz);
+	if (flag & NET_RECV_DISCARD)
+	{
+		glBufferData (GL_PIXEL_UNPACK_BUFFER, length, 0, GL_STREAM_DRAW);
+	}
 	float * v = glMapBufferRange (GL_ARRAY_BUFFER, 0, length, GL_MAP_WRITE_BIT);
-	memcpy (v, val, length);
-	glUnmapBuffer (GL_ARRAY_BUFFER);
+	if (v)
+	{
+		memcpy (v, val, length);
+		glUnmapBuffer (target);
+	}
 	nng_free (val, sz);
 }
+
+
+
 
