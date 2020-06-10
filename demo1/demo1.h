@@ -260,6 +260,7 @@ static void mesh_voxel_barycentric (uint32_t v[MESH_VOXEL_COUNT])
 	}
 }
 
+
 static void mesh_voxel_init (struct mesh_voxel * m)
 {
 	m4f32_identity (m->model);
@@ -352,9 +353,31 @@ static void mesh_voxel_update_from_socket (struct mesh_voxel * m, uint8_t nx, ui
 
 
 
+#define MESH_VOXEL_PALLETE_W 256
+#define MESH_VOXEL_PALLETE_H 1
+#define MESH_VOXEL_PALLETE_C 4
+#define MESH_VOXEL_PALLETE_WHC (MESH_VOXEL_PALLETE_W*MESH_VOXEL_PALLETE_H*MESH_VOXEL_PALLETE_C)
+#define MESH_VOXEL_PALLETE_TYPE GL_UNSIGNED_BYTE
+#define MESH_VOXEL_PALLETE_FORMAT GL_RGBA
+#define MESH_VOXEL_PALLETE_UNIT 1
 
-
-
+void mesh_voxel_texture_pallete (GLuint program, GLuint tex, uint8_t data[MESH_VOXEL_PALLETE_W])
+{
+	//Setup Pallete texture format.
+	glActiveTexture (GL_TEXTURE0 + MESH_VOXEL_PALLETE_UNIT);
+	glBindTexture (GL_TEXTURE_2D, tex);
+	glUseProgram (program);
+	GLint location = glGetUniformLocation (program, "pallete");
+	glUniform1i (location, MESH_VOXEL_PALLETE_UNIT);
+	glPixelStorei (GL_UNPACK_ALIGNMENT, 1);
+	glTexImage2D (GL_TEXTURE_2D, 0, MESH_VOXEL_PALLETE_FORMAT, MESH_VOXEL_PALLETE_W, MESH_VOXEL_PALLETE_H, 0, MESH_VOXEL_PALLETE_FORMAT, MESH_VOXEL_PALLETE_TYPE, data);
+	glTexParameteri (GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+	glTexParameteri (GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+	glTexParameteri (GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+	//glTexParameteri (GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+	glTexParameteri (GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR_MIPMAP_LINEAR);
+	glGenerateMipmap (GL_TEXTURE_2D);
+}
 
 
 

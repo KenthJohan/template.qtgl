@@ -2,14 +2,15 @@
 
 layout (location = 0) in vec4 pos;
 layout (location = 1) in vec4 v_bc;
-out vec4 texcoord;
+out float colortype;
 uniform mat4 mvp;
 out vec3 vbc;
 
 void main()
 {
 	vbc = v_bc.xyz;
-	texcoord = pos;
+	//colortype = pos.w;
+	colortype = pos.w;
 	gl_Position = mvp * vec4(pos.xyz, 1.0);
 }
 

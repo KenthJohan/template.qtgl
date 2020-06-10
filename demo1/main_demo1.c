@@ -58,6 +58,7 @@ enum main_glpbo
 enum main_gltex
 {
 	MAIN_GLTEX_0,
+	MAIN_GLTEX_RGBA256,
 	MAIN_GLTEX_COUNT
 };
 
@@ -123,6 +124,7 @@ int main (int argc, char * argv[])
 	glEnable (GL_VERTEX_PROGRAM_POINT_SIZE);
 	glEnable (GL_TEXTURE_2D);
 	glEnable (GL_POINT_SMOOTH);
+	glDisable (GL_DITHER);
 	glPointSize (50.0f);
 	glLineWidth (20.0f);
 
@@ -216,6 +218,13 @@ int main (int argc, char * argv[])
 	//pair_listen (sock + MAIN_NNGSOCK_TEX, "tcp://:9004");
 	pair_listen (sock + MAIN_NNGSOCK_VOXEL, "tcp://:9005");
 
+	uint8_t rgb256[MESH_VOXEL_PALLETE_WHC];
+	for (int i = 0; i < MESH_VOXEL_PALLETE_WHC; ++i)
+	{
+		rgb256[i] = rand();
+	}
+	mesh_voxel_texture_pallete (gprogram[MAIN_GLPROGRAM_VOXEL], gtexture[MAIN_GLTEX_RGBA256], rgb256);
+
 
 
 	struct csc_sdlcam cam;
@@ -282,18 +291,19 @@ int main (int argc, char * argv[])
 		glClearColor (0.2f, 0.3f, 0.3f, 1.0f);
 		glClear (GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
-		mesh_rectangle_draw (&mrectangletex, cam.mvp);
+		//mesh_rectangle_draw (&mrectangletex, cam.mvp);
 		mesh_pointcloud_draw (&mpointcloud, cam.mvp);
 		mesh_voxel_draw (&mvoxel, cam.mvp);
 
 
 		// copy pixels from PBO to texture object
 		// Use offset instead of ponter
+		/*
 		glBindTexture (GL_TEXTURE_2D, gtexture[MAIN_GLTEX_0]);
 		glBindBuffer (GL_PIXEL_UNPACK_BUFFER, pbo[MAIN_GLPBO_0]);
 		glTexSubImage2D (GL_TEXTURE_2D, 0, 0, 0, TEX_W, TEX_H, GL_RGBA, GL_UNSIGNED_BYTE, 0);
 
-		/*
+
 		glBindBuffer (GL_PIXEL_UNPACK_BUFFER, pbo[MAIN_GLPBO_0]);
 		// map the buffer object into client's memory
 		// Note that glMapBuffer() causes sync issue.
