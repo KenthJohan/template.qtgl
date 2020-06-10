@@ -12,6 +12,6 @@ void main()
 	gl_Position = mvp * vec4(pos.xyz, 1.0);
 	ourColor = col;
 	TexCoord = vec2(tex.x, tex.y);
-	gl_PointSize = 10.0f / gl_Position.w;
+	gl_PointSize = 30.0f / gl_Position.w;
 }
 

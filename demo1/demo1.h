@@ -50,6 +50,7 @@ struct mesh_rectangle
 	GLuint texture;
 	GLuint program;
 	GLuint uniform_mvp;
+	float model[4*4];
 };
 
 struct mesh_pointcloud
@@ -61,6 +62,20 @@ struct mesh_pointcloud
 	GLuint program;
 	GLuint uniform_mvp;
 };
+
+struct mesh_voxel
+{
+	unsigned cap;
+	unsigned last;
+	GLuint vao;
+	GLuint vbop;
+	GLuint vbob;
+	GLuint program;
+	GLuint uniform_mvp;
+	GLuint texture_pallete;
+	float model[4*4];
+};
+
 
 static void mesh_pointcloud_init (struct mesh_pointcloud * m)
 {
@@ -122,6 +137,7 @@ static void mesh_pointcloud_draw (struct mesh_pointcloud * m, float * mvp)
 
 static void mesh_rectangle_init (struct mesh_rectangle * m)
 {
+	m4f32_identity (m->model);
 	glGenVertexArrays(1, &m->vao);
 	glGenBuffers(1, &m->vbop);
 	glGenBuffers(1, &m->vboc);
@@ -180,28 +196,25 @@ static void mesh_rectangle_draw (struct mesh_rectangle * m, float * mvp)
 	glUniform1i (glGetUniformLocation (m->program, "texture1"), 0);
 	glActiveTexture (GL_TEXTURE0);
 	glBindTexture (GL_TEXTURE_2D, m->texture);
-	glUniformMatrix4fv (m->uniform_mvp, 1, GL_FALSE, (const GLfloat *) mvp);
+	float mmvp[4*4];
+	m4f32_mul (mmvp, mvp, m->model);
+	glUniformMatrix4fv (m->uniform_mvp, 1, GL_FALSE, (const GLfloat *) mmvp);
 	glBindVertexArray (m->vao);
 	glDrawArrays (GL_TRIANGLES, 0, m->cap);
 }
 
 
-
-
-struct mesh_voxel
-{
-	unsigned cap;
-	unsigned last;
-	GLuint vao;
-	GLuint vbop;
-	GLuint vbob;
-	GLuint program;
-	GLuint uniform_mvp;
-	float model[4*4];
-};
-
 #define byte4(a,b,c,d) (((a) << 0) | ((b) << 8) | ((c) << 16) | ((d) << 24))
 #define MESH_VOXEL_COUNT 36
+
+#define MESH_VOXEL_PALLETE_W 256
+#define MESH_VOXEL_PALLETE_H 1
+#define MESH_VOXEL_PALLETE_C 4
+#define MESH_VOXEL_PALLETE_WHC (MESH_VOXEL_PALLETE_W*MESH_VOXEL_PALLETE_H*MESH_VOXEL_PALLETE_C)
+#define MESH_VOXEL_PALLETE_TYPE GL_UNSIGNED_BYTE
+#define MESH_VOXEL_PALLETE_FORMAT GL_RGBA
+#define MESH_VOXEL_PALLETE_UNIT 1
+
 
 static void mesh_voxe_cube (uint32_t v[MESH_VOXEL_COUNT], uint8_t x, uint8_t y, uint8_t z, uint8_t type)
 {
@@ -295,6 +308,10 @@ static void mesh_voxel_init (struct mesh_voxel * m)
 static void mesh_voxel_draw (struct mesh_voxel * m, float mvp[4*4])
 {
 	glUseProgram (m->program);
+	GLint location = glGetUniformLocation (m->program, "pallete");
+	glUniform1i (location, MESH_VOXEL_PALLETE_UNIT);
+	glActiveTexture (GL_TEXTURE0 + MESH_VOXEL_PALLETE_UNIT);
+	glBindTexture (GL_TEXTURE_2D, m->texture_pallete);
 	float mmvp[4*4];
 	m4f32_mul (mmvp, mvp, m->model);
 	glUniformMatrix4fv (m->uniform_mvp, 1, GL_FALSE, (const GLfloat *) mmvp);
@@ -346,20 +363,13 @@ static void mesh_voxel_update_from_socket (struct mesh_voxel * m, uint8_t nx, ui
 	{
 		NNG_EXIT_ON_ERROR (rv);
 	}
-	ASSERT (sz == nx*ny*nz);
+	ASSERTF (sz == nx*ny*nz, "%ix%ix%i=%i, sz=%i", nx, ny, nz, nx*ny*nz, sz);
 	mesh_voxel_update (m, val, nx, ny, nz);
 	nng_free (val, sz);
 }
 
 
 
-#define MESH_VOXEL_PALLETE_W 256
-#define MESH_VOXEL_PALLETE_H 1
-#define MESH_VOXEL_PALLETE_C 4
-#define MESH_VOXEL_PALLETE_WHC (MESH_VOXEL_PALLETE_W*MESH_VOXEL_PALLETE_H*MESH_VOXEL_PALLETE_C)
-#define MESH_VOXEL_PALLETE_TYPE GL_UNSIGNED_BYTE
-#define MESH_VOXEL_PALLETE_FORMAT GL_RGBA
-#define MESH_VOXEL_PALLETE_UNIT 1
 
 void mesh_voxel_texture_pallete (GLuint program, GLuint tex, uint8_t data[MESH_VOXEL_PALLETE_W])
 {

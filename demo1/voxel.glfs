@@ -19,6 +19,6 @@ void main()
 {
 	vec3 color = vec3(0.0, 0.0, 1.0);
 	color = texture2D (pallete, vec2 (round (colortype)/256, 0)).rgb;
-	gl_FragColor = vec4(min(vec3(edgeFactor()), color), 1.0);
+	gl_FragColor = vec4(min(vec3(edgeFactor()), color), 0.5);
 	//gl_FragColor = color;
 }
