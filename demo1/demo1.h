@@ -135,7 +135,30 @@ static void mesh_pointcloud_draw (struct mesh_pointcloud * m, float * mvp)
 }
 
 
-static void mesh_rectangle_init (struct mesh_rectangle * m)
+static void mesh_rectangle_set4pos (struct mesh_rectangle * m, float const a[3], float const b[3], float const c[3], float const d[3])
+{
+	float const p[] =
+	{
+	a[0], a[1], a[2], 1.0f, // a, left, bottom
+	b[0], b[1], b[2], 1.0f, // b, right, bottom
+	c[0], c[1], c[2], 1.0f, // c, right, top
+	a[0], a[1], a[2], 1.0f, // a, left, bottom
+	c[0], c[1], c[2], 1.0f, // c, right, top
+	d[0], d[1], d[2], 1.0f  // d, left, top
+	};
+	glBindBuffer (GL_ARRAY_BUFFER, m->vbop);
+	GLsizeiptr length = m->cap*sizeof(float)*4;
+	float * v = glMapBufferRange (GL_ARRAY_BUFFER, 0, length, GL_MAP_WRITE_BIT);
+	if (v)
+	{
+		ASSERT (sizeof (p) <= length);
+		memcpy(v, p, sizeof (p));
+		glUnmapBuffer (GL_ARRAY_BUFFER);
+	}
+}
+
+
+static void mesh_rectangle_init (struct mesh_rectangle * m, float uv)
 {
 	m4f32_identity (m->model);
 	glGenVertexArrays(1, &m->vao);
@@ -164,11 +187,11 @@ static void mesh_rectangle_init (struct mesh_rectangle * m)
 	float const t[] =
 	{
 	0.0f, 0.0f, // left, bottom
-	1.0f, 0.0f, // right, bottom
-	1.0f, 1.0f, // right, top
+	uv, 0.0f, // right, bottom
+	uv, uv, // right, top
 	0.0f, 0.0f, // left, bottom
-	1.0f, 1.0f, // right, top
-	0.0f, 1.0f  // left, top
+	uv, uv, // right, top
+	0.0f, uv  // left, top
 	};
 
 	glBindVertexArray (m->vao);

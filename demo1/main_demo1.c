@@ -37,7 +37,7 @@
 #define VOX_YN 30
 #define VOX_ZN 10
 #define VOX_I(x,y,z) ((z)*VOX_XN*VOX_YN + (y)*VOX_XN + (x))
-#define VOX_SCALE 0.1f
+#define VOX_SCALE 0.15f
 
 
 enum main_glprogram
@@ -58,6 +58,7 @@ enum main_glpbo
 enum main_gltex
 {
 	MAIN_GLTEX_0,
+	MAIN_GLTEX_BW,
 	MAIN_GLTEX_RGBA256,
 	MAIN_GLTEX_COUNT
 };
@@ -68,6 +69,7 @@ enum main_nngsock
 	MAIN_NNGSOCK_PLANE,
 	MAIN_NNGSOCK_TEX,
 	MAIN_NNGSOCK_VOXEL,
+	MAIN_NNGSOCK_GROUND,
 	MAIN_NNGSOCK_COUNT
 };
 
@@ -143,14 +145,14 @@ int main (int argc, char * argv[])
 	glBindBuffer (GL_PIXEL_UNPACK_BUFFER, 0);
 
 
-	char const * shaderfiles1[] = {"../demo1/pos_col.glvs", "../demo1/pos_col.glfs", NULL};
+	char const * shaderfiles1[] = {"../demo1/pointcloud.glvs", "../demo1/pointcloud.glfs", NULL};
 	gprogram[MAIN_GLPROGRAM_POINTCLOUD] = csc_gl_program_from_files (shaderfiles1);
 	glBindAttribLocation (gprogram[MAIN_GLPROGRAM_POINTCLOUD], main_glattr_pos, "pos" );
 	glBindAttribLocation (gprogram[MAIN_GLPROGRAM_POINTCLOUD], main_glattr_col, "col" );
 	glLinkProgram (gprogram[MAIN_GLPROGRAM_POINTCLOUD]);
 
 
-	char const * shaderfiles2[] = {"../demo1/pos_col_tex.glvs", "../demo1/pos_col_tex.glfs", NULL};
+	char const * shaderfiles2[] = {"../demo1/standard.glvs", "../demo1/standard.glfs", NULL};
 	gprogram[MAIN_GLPROGRAM_STARNDARD] = csc_gl_program_from_files (shaderfiles2);
 	glBindAttribLocation (gprogram[MAIN_GLPROGRAM_STARNDARD], main_glattr_pos, "pos" );
 	glBindAttribLocation (gprogram[MAIN_GLPROGRAM_STARNDARD], main_glattr_col, "col" );
@@ -166,6 +168,7 @@ int main (int argc, char * argv[])
 
 
 	glGenTextures (MAIN_GLTEX_COUNT, gtexture);
+
 	glBindTexture (GL_TEXTURE_2D, gtexture[MAIN_GLTEX_0]);
 	glTexParameteri (GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_REPEAT);
 	glTexParameteri (GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_REPEAT);
@@ -174,6 +177,22 @@ int main (int argc, char * argv[])
 	glTexImage2D (GL_TEXTURE_2D, 0, GL_RGBA, TEX_W, TEX_H, 0, GL_RGBA, GL_UNSIGNED_BYTE, NULL);
 	glGenerateMipmap (GL_TEXTURE_2D);
 
+	glBindTexture (GL_TEXTURE_2D, gtexture[MAIN_GLTEX_BW]);
+	glTexParameteri (GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_REPEAT);
+	glTexParameteri (GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_REPEAT);
+	glTexParameteri (GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
+	glTexParameteri (GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+	uint8_t bw[4*4] =
+	{
+	0x88, 0x88, 0x88, 0xFF,
+	0x55, 0x55, 0x55, 0xFF,
+	0x55, 0x55, 0x55, 0xFF,
+	0x88, 0x88, 0x88, 0xFF,
+	};
+	glTexImage2D (GL_TEXTURE_2D, 0, GL_RGBA, 2, 2, 0, GL_RGBA, GL_UNSIGNED_BYTE, bw);
+	glGenerateMipmap (GL_TEXTURE_2D);
+
+
 
 
 	struct mesh_rectangle mrectangletex = {0};
@@ -181,8 +200,18 @@ int main (int argc, char * argv[])
 	mrectangletex.uniform_mvp = glGetUniformLocation (gprogram[MAIN_GLPROGRAM_STARNDARD], "mvp");
 	mrectangletex.program = gprogram[MAIN_GLPROGRAM_STARNDARD];
 	mrectangletex.texture = gtexture[MAIN_GLTEX_0];
-	mesh_rectangle_init (&mrectangletex);
+	mesh_rectangle_init (&mrectangletex, 1.0f);
 	m4f32_scale (mrectangletex.model, 0.1f);
+	m4f32_translation_xyz (mrectangletex.model, 10.0f, 0.0f, 0.0f);
+
+	struct mesh_rectangle mlidar = {0};
+	mlidar.cap = 6;
+	mlidar.uniform_mvp = glGetUniformLocation (gprogram[MAIN_GLPROGRAM_STARNDARD], "mvp");
+	mlidar.program = gprogram[MAIN_GLPROGRAM_STARNDARD];
+	mlidar.texture = gtexture[MAIN_GLTEX_BW];
+	mesh_rectangle_init (&mlidar, 10.0f);
+	m4f32_scale (mlidar.model, 10.0f);
+	m4f32_translation_xyz (mlidar.model, 0.0f, 0.0f, -0.4f);
 
 
 
@@ -215,7 +244,7 @@ int main (int argc, char * argv[])
 	*/
 	mesh_voxel_update (&mvoxel, voxel, VOX_XN, VOX_YN, VOX_ZN);
 	m4f32_scale (mvoxel.model, VOX_SCALE);
-	m4f32_translation_xyz (mvoxel.model, 0.0f*VOX_SCALE - VOX_SCALE/2, -(VOX_YN/2)*VOX_SCALE - VOX_SCALE/2, -(VOX_ZN/2)*VOX_SCALE - VOX_SCALE/2);
+	m4f32_translation_xyz (mvoxel.model, 0.0f*VOX_SCALE, -(VOX_YN/2)*VOX_SCALE, -(VOX_ZN/2)*VOX_SCALE);
 
 
 
@@ -327,6 +356,7 @@ int main (int argc, char * argv[])
 		glBindBuffer (GL_PIXEL_UNPACK_BUFFER, pbo[MAIN_GLPBO_0]);
 		glTexSubImage2D (GL_TEXTURE_2D, 0, 0, 0, TEX_W, TEX_H, GL_RGBA, GL_UNSIGNED_BYTE, 0);
 		mesh_rectangle_draw (&mrectangletex, cam.mvp);
+		mesh_rectangle_draw (&mlidar, cam.mvp);
 
 		mesh_pointcloud_draw (&mpointcloud, cam.mvp);
 
