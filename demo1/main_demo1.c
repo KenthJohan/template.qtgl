@@ -19,12 +19,17 @@
 
 #define WIN_X SDL_WINDOWPOS_UNDEFINED
 #define WIN_Y SDL_WINDOWPOS_UNDEFINED
+
+//#define WIN_X SDL_WINDOWPOS_CENTERED_DISPLAY(1)
+//#define WIN_Y SDL_WINDOWPOS_CENTERED_DISPLAY(1)
+
 #define WIN_W 640
 #define WIN_H 480
 #define WIN_TITLE "Texture Demo"
 
 #define MAIN_RUNNING    UINT32_C (0x00000001)
 #define MAIN_FULLSCREEN UINT32_C (0x00000002)
+#define MAIN_BORDERLESS UINT32_C (0x00000004)//SDL_WINDOW_BORDERLESS
 
 #define POINTC_W 320
 #define POINTC_H 20
@@ -92,7 +97,7 @@ int main (int argc, char * argv[])
 	uint32_t main_flags = MAIN_RUNNING;
 	SDL_Window * window;
 	SDL_Init (SDL_INIT_VIDEO);
-	window = SDL_CreateWindow (WIN_TITLE, WIN_X, WIN_Y, WIN_W, WIN_H, SDL_WINDOW_OPENGL);
+	window = SDL_CreateWindow (WIN_TITLE, WIN_X, WIN_Y, WIN_W, WIN_H, SDL_WINDOW_OPENGL|SDL_WINDOW_RESIZABLE);
 	if (window == NULL)
 	{
 		fprintf (stderr, "Could not create SDL_Window: %s\n", SDL_GetError());
@@ -300,6 +305,24 @@ int main (int argc, char * argv[])
 			{
 			case SDL_QUIT:
 				main_flags &= ~MAIN_RUNNING;
+				break;
+
+
+			case SDL_WINDOWEVENT:
+				switch (Event.window.event)
+				{
+				case SDL_WINDOWEVENT_RESIZED:
+					if(1)
+					{
+						int w;
+						int h;
+						SDL_GetWindowSize (window, &w, &h);
+						cam.w = w;
+						cam.h = h;
+						glViewport (0, 0, w, h);
+					}
+					break;
+				}
 				break;
 
 			case SDL_KEYDOWN:
