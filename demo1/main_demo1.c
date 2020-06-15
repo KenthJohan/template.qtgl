@@ -34,8 +34,7 @@
 #define POINTC_W 320
 #define POINTC_H 20
 
-#define TEX_W 100
-#define TEX_H 100
+
 
 
 #define VOX_XN 60
@@ -44,6 +43,10 @@
 #define VOX_I(x,y,z) ((z)*VOX_XN*VOX_YN + (y)*VOX_XN + (x))
 #define VOX_SCALE 0.15f
 
+#define TEX_W VOX_XN
+#define TEX_H VOX_YN
+#define TEX_C 4
+#define TEX_FORMAT GL_RGBA
 
 enum main_glprogram
 {
@@ -78,14 +81,6 @@ enum main_nngsock
 	MAIN_NNGSOCK_COUNT
 };
 
-
-void updatePixels (uint8_t a[], uint32_t n, uint64_t k)
-{
-	for (uint32_t i = 0; i < n; ++i)
-	{
-		a[i] = rand();
-	}
-}
 
 int main (int argc, char * argv[])
 {
@@ -179,7 +174,7 @@ int main (int argc, char * argv[])
 	glTexParameteri (GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_REPEAT);
 	glTexParameteri (GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
 	glTexParameteri (GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
-	glTexImage2D (GL_TEXTURE_2D, 0, GL_RGBA, TEX_W, TEX_H, 0, GL_RGBA, GL_UNSIGNED_BYTE, NULL);
+	glTexImage2D (GL_TEXTURE_2D, 0, GL_RGBA, TEX_W, TEX_H, 0, TEX_FORMAT, GL_UNSIGNED_BYTE, NULL);
 	glGenerateMipmap (GL_TEXTURE_2D);
 
 	glBindTexture (GL_TEXTURE_2D, gtexture[MAIN_GLTEX_BW]);
@@ -200,39 +195,39 @@ int main (int argc, char * argv[])
 
 
 
-	struct mesh_rectangle mrectangletex = {0};
-	mrectangletex.cap = 6;
-	mrectangletex.uniform_mvp = glGetUniformLocation (gprogram[MAIN_GLPROGRAM_STARNDARD], "mvp");
-	mrectangletex.program = gprogram[MAIN_GLPROGRAM_STARNDARD];
-	mrectangletex.texture = gtexture[MAIN_GLTEX_0];
-	mesh_rectangle_init (&mrectangletex, 1.0f);
-	m4f32_scale (mrectangletex.model, 0.1f);
-	m4f32_translation_xyz (mrectangletex.model, 10.0f, 0.0f, 0.0f);
+	struct demo_mesh_rectangle mesh_groundprojection = {0};
+	mesh_groundprojection.cap = 6;
+	mesh_groundprojection.uniform_mvp = glGetUniformLocation (gprogram[MAIN_GLPROGRAM_STARNDARD], "mvp");
+	mesh_groundprojection.program = gprogram[MAIN_GLPROGRAM_STARNDARD];
+	mesh_groundprojection.texture = gtexture[MAIN_GLTEX_0];
+	demo_mesh_rectangle_init (&mesh_groundprojection, 1.0f);
+	m4f32_scale_xyz (mesh_groundprojection.model, VOX_XN*VOX_SCALE/2, VOX_YN*VOX_SCALE/2, 1.0f);
+	m4f32_translation_xyz (mesh_groundprojection.model, VOX_XN*VOX_SCALE/2, 0.0f, -0.3f);
 
-	struct mesh_rectangle mlidar = {0};
-	mlidar.cap = 6;
-	mlidar.uniform_mvp = glGetUniformLocation (gprogram[MAIN_GLPROGRAM_STARNDARD], "mvp");
-	mlidar.program = gprogram[MAIN_GLPROGRAM_STARNDARD];
-	mlidar.texture = gtexture[MAIN_GLTEX_BW];
-	mesh_rectangle_init (&mlidar, 10.0f);
-	m4f32_scale (mlidar.model, 10.0f);
-	m4f32_translation_xyz (mlidar.model, 0.0f, 0.0f, -0.4f);
+	struct demo_mesh_rectangle mesh_chess = {0};
+	mesh_chess.cap = 6;
+	mesh_chess.uniform_mvp = glGetUniformLocation (gprogram[MAIN_GLPROGRAM_STARNDARD], "mvp");
+	mesh_chess.program = gprogram[MAIN_GLPROGRAM_STARNDARD];
+	mesh_chess.texture = gtexture[MAIN_GLTEX_BW];
+	demo_mesh_rectangle_init (&mesh_chess, 10.0f);
+	m4f32_scale (mesh_chess.model, 10.0f);
+	m4f32_translation_xyz (mesh_chess.model, 0.0f, 0.0f, -0.4f);
 
 
 
-	struct mesh_pointcloud mpointcloud = {0};
+	struct demo_mesh_pointcloud mpointcloud = {0};
 	mpointcloud.cap = POINTC_W*POINTC_H;
 	mpointcloud.uniform_mvp = glGetUniformLocation (gprogram[MAIN_GLPROGRAM_POINTCLOUD], "mvp");
 	mpointcloud.program = gprogram[MAIN_GLPROGRAM_POINTCLOUD];
-	mesh_pointcloud_init (&mpointcloud);
+	demo_mesh_pointcloud_init (&mpointcloud);
 
 
-	struct mesh_voxel mvoxel = {0};
+	struct demo_mesh_voxel mvoxel = {0};
 	mvoxel.cap = VOX_XN*VOX_YN*VOX_ZN;
 	mvoxel.uniform_mvp = glGetUniformLocation (gprogram[MAIN_GLPROGRAM_VOXEL], "mvp");
 	mvoxel.program = gprogram[MAIN_GLPROGRAM_VOXEL];
 	mvoxel.texture_pallete = gtexture[MAIN_GLTEX_RGBA256];
-	mesh_voxel_init (&mvoxel);
+	demo_mesh_voxel_init (&mvoxel);
 
 	uint8_t voxel[VOX_XN*VOX_YN*VOX_ZN] = {0};
 	/*
@@ -255,7 +250,7 @@ int main (int argc, char * argv[])
 
 	pair_listen (sock + MAIN_NNGSOCK_POINTCLOUD, "tcp://:9002");
 	//pair_listen (sock + MAIN_NNGSOCK_PLANE, "tcp://:9003");
-	//pair_listen (sock + MAIN_NNGSOCK_TEX, "tcp://:9004");
+	pair_listen (sock + MAIN_NNGSOCK_TEX, "tcp://:9004");
 	pair_listen (sock + MAIN_NNGSOCK_VOXEL, "tcp://:9005");
 
 	uint8_t rgb256[MESH_VOXEL_PALLETE_WHC];
@@ -263,29 +258,9 @@ int main (int argc, char * argv[])
 	{
 		rgb256[i] = rand();
 	}
-	mesh_voxel_texture_pallete (gprogram[MAIN_GLPROGRAM_VOXEL], gtexture[MAIN_GLTEX_RGBA256], rgb256);
+	demo_mesh_voxel_texture_pallete (gprogram[MAIN_GLPROGRAM_VOXEL], gtexture[MAIN_GLTEX_RGBA256], rgb256);
 
 
-	{
-		glBindBuffer (GL_PIXEL_UNPACK_BUFFER, pbo[MAIN_GLPBO_0]);
-		// map the buffer object into client's memory
-		// Note that glMapBuffer() causes sync issue.
-		// If GPU is working with this buffer, glMapBuffer() will wait(stall)
-		// for GPU to finish its job. To avoid waiting (stall), you can call
-		// first glBufferData() with NULL pointer before glMapBuffer().
-		// If you do that, the previous data in PBO will be discarded and
-		// glMapBuffer() returns a new allocated pointer immediately
-		// even if GPU is still working with the previous data.
-		glBufferData (GL_PIXEL_UNPACK_BUFFER, TEX_W*TEX_H*4, 0, GL_STREAM_DRAW);
-		//GLubyte* ptr = (GLubyte*)glMapBuffer (GL_PIXEL_UNPACK_BUFFER, GL_WRITE_ONLY);
-		GLubyte* ptr = (GLubyte*)glMapBufferRange (GL_PIXEL_UNPACK_BUFFER, 0, TEX_W*TEX_H*4, GL_MAP_WRITE_BIT);
-		if(ptr)
-		{
-			// update data directly on the mapped buffer
-			updatePixels (ptr, TEX_W*TEX_H*4, 1);
-			glUnmapBuffer (GL_PIXEL_UNPACK_BUFFER);  // release pointer to mapping buffer
-		}
-	}
 
 
 
@@ -377,19 +352,21 @@ int main (int argc, char * argv[])
 		// Use offset instead of ponter
 		glBindTexture (GL_TEXTURE_2D, gtexture[MAIN_GLTEX_0]);
 		glBindBuffer (GL_PIXEL_UNPACK_BUFFER, pbo[MAIN_GLPBO_0]);
-		glTexSubImage2D (GL_TEXTURE_2D, 0, 0, 0, TEX_W, TEX_H, GL_RGBA, GL_UNSIGNED_BYTE, 0);
-		mesh_rectangle_draw (&mrectangletex, cam.mvp);
-		mesh_rectangle_draw (&mlidar, cam.mvp);
+		glTexSubImage2D (GL_TEXTURE_2D, 0, 0, 0, TEX_W, TEX_H, TEX_FORMAT, GL_UNSIGNED_BYTE, 0);
+		demo_mesh_rectangle_draw (&mesh_groundprojection, cam.mvp);
+		demo_mesh_rectangle_draw (&mesh_chess, cam.mvp);
 
-		mesh_pointcloud_draw (&mpointcloud, cam.mvp);
+		demo_mesh_pointcloud_draw (&mpointcloud, cam.mvp);
 
-		mesh_voxel_draw (&mvoxel, cam.mvp);
+		demo_mesh_voxel_draw (&mvoxel, cam.mvp);
 
 
 		net_recv (sock[MAIN_NNGSOCK_POINTCLOUD], GL_ARRAY_BUFFER, mpointcloud.vbop, mpointcloud.cap, 0);
 		//net_recv (sock[MAIN_NNGSOCK_PLANE], GL_ARRAY_BUFFER, mrectangletex.vbop, mrectangletex.cap, 0);
 		//net_recv (sock[MAIN_NNGSOCK_TEX], GL_PIXEL_UNPACK_BUFFER, pbo[MAIN_GLPBO_0], TEX_W*TEX_H*4, NET_RECV_DISCARD);
-		mesh_voxel_update_from_socket (&mvoxel, VOX_XN, VOX_YN, VOX_ZN, sock[MAIN_NNGSOCK_VOXEL]);
+		demo_mesh_voxel_update_from_socket (&mvoxel, VOX_XN, VOX_YN, VOX_ZN, sock[MAIN_NNGSOCK_VOXEL]);
+
+		net_update_texture (sock[MAIN_NNGSOCK_TEX], pbo[MAIN_GLPBO_0], TEX_W*TEX_H*TEX_C);
 
 
 		SDL_Delay (10);

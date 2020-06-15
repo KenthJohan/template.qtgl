@@ -18,6 +18,51 @@
 #include <nng/supplemental/util/platform.h>
 
 
+
+void pair_listen (nng_socket * sock, char const * address)
+{
+	int r;
+	r = nng_pair0_open (sock);
+	NNG_EXIT_ON_ERROR (r);
+	r = nng_listen (*sock, address, NULL, 0);
+	NNG_EXIT_ON_ERROR (r);
+}
+
+
+#define NET_RECV_DISCARD 0x01
+
+void net_recv (nng_socket sock, GLenum target, GLuint vbo, unsigned cap, int flag)
+{
+	int rv;
+	size_t sz;
+	float * val = NULL;
+	rv = nng_recv (sock, &val, &sz, NNG_FLAG_ALLOC | NNG_FLAG_NONBLOCK);
+	if (rv == NNG_EAGAIN)
+	{
+		return;
+	}
+	else if (rv != 0)
+	{
+		NNG_EXIT_ON_ERROR (rv);
+	}
+	//printf ("New message %i\n", sz);
+	glBindBuffer (target, vbo);
+	GLsizeiptr length = MIN (cap * sizeof(float) * 4, sz);
+	if (flag & NET_RECV_DISCARD)
+	{
+		glBufferData (GL_PIXEL_UNPACK_BUFFER, length, 0, GL_STREAM_DRAW);
+	}
+	float * v = glMapBufferRange (GL_ARRAY_BUFFER, 0, length, GL_MAP_WRITE_BIT);
+	if (v)
+	{
+		memcpy (v, val, length);
+		glUnmapBuffer (target);
+	}
+	nng_free (val, sz);
+}
+
+
+
 static void APIENTRY openglCallbackFunction(GLenum source,GLenum type,GLuint id,GLenum severity,GLsizei length,const GLchar* message,const void* userParam)
 {
 	(void)source;
@@ -40,7 +85,7 @@ static void APIENTRY openglCallbackFunction(GLenum source,GLenum type,GLuint id,
 #define main_glattr_tex 2
 
 
-struct mesh_rectangle
+struct demo_mesh_rectangle
 {
 	unsigned cap;
 	GLuint vao;
@@ -53,7 +98,7 @@ struct mesh_rectangle
 	float model[4*4];
 };
 
-struct mesh_pointcloud
+struct demo_mesh_pointcloud
 {
 	unsigned cap;
 	GLuint vao;
@@ -63,7 +108,7 @@ struct mesh_pointcloud
 	GLuint uniform_mvp;
 };
 
-struct mesh_voxel
+struct demo_mesh_voxel
 {
 	unsigned cap;
 	unsigned last;
@@ -77,7 +122,7 @@ struct mesh_voxel
 };
 
 
-static void mesh_pointcloud_init (struct mesh_pointcloud * m)
+static void demo_mesh_pointcloud_init (struct demo_mesh_pointcloud * m)
 {
 	glGenVertexArrays(1, &m->vao);
 	glGenBuffers(1, &m->vbop);
@@ -126,7 +171,7 @@ static void mesh_pointcloud_init (struct mesh_pointcloud * m)
 }
 
 
-static void mesh_pointcloud_draw (struct mesh_pointcloud * m, float * mvp)
+static void demo_mesh_pointcloud_draw (struct demo_mesh_pointcloud * m, float * mvp)
 {
 	glUseProgram (m->program);
 	glUniformMatrix4fv (m->uniform_mvp, 1, GL_FALSE, (const GLfloat *) mvp);
@@ -135,7 +180,7 @@ static void mesh_pointcloud_draw (struct mesh_pointcloud * m, float * mvp)
 }
 
 
-static void mesh_rectangle_set4pos (struct mesh_rectangle * m, float const a[3], float const b[3], float const c[3], float const d[3])
+static void mesh_rectangle_set4pos (struct demo_mesh_rectangle * m, float const a[3], float const b[3], float const c[3], float const d[3])
 {
 	float const p[] =
 	{
@@ -158,7 +203,7 @@ static void mesh_rectangle_set4pos (struct mesh_rectangle * m, float const a[3],
 }
 
 
-static void mesh_rectangle_init (struct mesh_rectangle * m, float uv)
+static void demo_mesh_rectangle_init (struct demo_mesh_rectangle * m, float uv)
 {
 	m4f32_identity (m->model);
 	glGenVertexArrays(1, &m->vao);
@@ -213,7 +258,7 @@ static void mesh_rectangle_init (struct mesh_rectangle * m, float uv)
 }
 
 
-static void mesh_rectangle_draw (struct mesh_rectangle * m, float * mvp)
+static void demo_mesh_rectangle_draw (struct demo_mesh_rectangle * m, float * mvp)
 {
 	glUseProgram (m->program);
 	glUniform1i (glGetUniformLocation (m->program, "texture1"), 0);
@@ -225,6 +270,9 @@ static void mesh_rectangle_draw (struct mesh_rectangle * m, float * mvp)
 	glBindVertexArray (m->vao);
 	glDrawArrays (GL_TRIANGLES, 0, m->cap);
 }
+
+
+
 
 
 #define byte4(a,b,c,d) (((a) << 0) | ((b) << 8) | ((c) << 16) | ((d) << 24))
@@ -297,7 +345,7 @@ static void mesh_voxel_barycentric (uint32_t v[MESH_VOXEL_COUNT])
 }
 
 
-static void mesh_voxel_init (struct mesh_voxel * m)
+static void demo_mesh_voxel_init (struct demo_mesh_voxel * m)
 {
 	m4f32_identity (m->model);
 	glGenVertexArrays(1, &m->vao);
@@ -328,7 +376,7 @@ static void mesh_voxel_init (struct mesh_voxel * m)
 }
 
 
-static void mesh_voxel_draw (struct mesh_voxel * m, float mvp[4*4])
+static void demo_mesh_voxel_draw (struct demo_mesh_voxel * m, float mvp[4*4])
 {
 	glUseProgram (m->program);
 	GLint location = glGetUniformLocation (m->program, "pallete");
@@ -343,7 +391,7 @@ static void mesh_voxel_draw (struct mesh_voxel * m, float mvp[4*4])
 }
 
 
-static void mesh_voxel_update (struct mesh_voxel * m, uint8_t vox[], uint8_t nx, uint8_t ny, uint8_t nz)
+static void mesh_voxel_update (struct demo_mesh_voxel * m, uint8_t vox[], uint8_t nx, uint8_t ny, uint8_t nz)
 {
 	glBindBuffer (GL_ARRAY_BUFFER, m->vbop);
 	GLsizeiptr length = m->cap*MESH_VOXEL_COUNT*sizeof(uint32_t);
@@ -372,7 +420,7 @@ static void mesh_voxel_update (struct mesh_voxel * m, uint8_t vox[], uint8_t nx,
 }
 
 
-static void mesh_voxel_update_from_socket (struct mesh_voxel * m, uint8_t nx, uint8_t ny, uint8_t nz, nng_socket sock)
+static void demo_mesh_voxel_update_from_socket (struct demo_mesh_voxel * m, uint8_t nx, uint8_t ny, uint8_t nz, nng_socket sock)
 {
 	int rv;
 	size_t sz;
@@ -394,7 +442,7 @@ static void mesh_voxel_update_from_socket (struct mesh_voxel * m, uint8_t nx, ui
 
 
 
-void mesh_voxel_texture_pallete (GLuint program, GLuint tex, uint8_t data[MESH_VOXEL_PALLETE_W])
+void demo_mesh_voxel_texture_pallete (GLuint program, GLuint tex, uint8_t data[MESH_VOXEL_PALLETE_W])
 {
 	//Setup Pallete texture format.
 	glActiveTexture (GL_TEXTURE0 + MESH_VOXEL_PALLETE_UNIT);
@@ -416,52 +464,70 @@ void mesh_voxel_texture_pallete (GLuint program, GLuint tex, uint8_t data[MESH_V
 
 
 
-
-
-
-
-
-void pair_listen (nng_socket * sock, char const * address)
+void updatePixels (uint8_t a[], uint32_t n, uint64_t k)
 {
-	int r;
-	r = nng_pair0_open (sock);
-	NNG_EXIT_ON_ERROR (r);
-	r = nng_listen (*sock, address, NULL, 0);
-	NNG_EXIT_ON_ERROR (r);
+	for (uint32_t i = 0; i < n; ++i)
+	{
+		a[i] = rand();
+	}
 }
 
 
-#define NET_RECV_DISCARD 0x01
 
-void net_recv (nng_socket sock, GLenum target, GLuint vbo, unsigned cap, int flag)
+//pbo[MAIN_GLPBO_0],TEX_W*TEX_H*4
+static void net_update_texture (nng_socket sock, GLuint pbo, uint32_t size8)
 {
+	ASSERT (glIsBuffer (pbo));
+	glBindBuffer (GL_PIXEL_UNPACK_BUFFER, pbo);
+	// map the buffer object into client's memory
+	// Note that glMapBuffer() causes sync issue.
+	// If GPU is working with this buffer, glMapBuffer() will wait(stall)
+	// for GPU to finish its job. To avoid waiting (stall), you can call
+	// first glBufferData() with NULL pointer before glMapBuffer().
+	// If you do that, the previous data in PBO will be discarded and
+	// glMapBuffer() returns a new allocated pointer immediately
+	// even if GPU is still working with the previous data.
+	glBufferData (GL_PIXEL_UNPACK_BUFFER, size8, 0, GL_STREAM_DRAW);
+	//GLubyte* ptr = (GLubyte*)glMapBuffer (GL_PIXEL_UNPACK_BUFFER, GL_WRITE_ONLY);
+	GLubyte * ptr = (GLubyte*)glMapBufferRange (GL_PIXEL_UNPACK_BUFFER, 0, size8, GL_MAP_WRITE_BIT);
+	ASSERT (ptr);
+
+	/*
+	for (uint32_t i = 0; i < size8; ++i)
+	{
+		ptr[i] = rand();
+	}
+	*/
+	//glUnmapBuffer (GL_PIXEL_UNPACK_BUFFER);
+	//return;
+
+
+	//update data directly on the mapped buffer
+	//updatePixels (ptr, TEX_W*TEX_H*4, 1);
+	//glUnmapBuffer (GL_PIXEL_UNPACK_BUFFER);
+	//return;
+
 	int rv;
 	size_t sz;
-	float * val = NULL;
+	uint8_t * val = NULL;
 	rv = nng_recv (sock, &val, &sz, NNG_FLAG_ALLOC | NNG_FLAG_NONBLOCK);
+	//printf ("rv %i\n", rv);
 	if (rv == NNG_EAGAIN)
-	{
-		return;
-	}
+	{}
 	else if (rv != 0)
 	{
 		NNG_EXIT_ON_ERROR (rv);
 	}
-	//printf ("New message %i\n", sz);
-	glBindBuffer (target, vbo);
-	GLsizeiptr length = MIN (cap * sizeof(float) * 4, sz);
-	if (flag & NET_RECV_DISCARD)
+	else
 	{
-		glBufferData (GL_PIXEL_UNPACK_BUFFER, length, 0, GL_STREAM_DRAW);
+		ASSERT (size8 == sz);
+		memcpy (ptr, val, size8);
+		nng_free (val, sz);
 	}
-	float * v = glMapBufferRange (GL_ARRAY_BUFFER, 0, length, GL_MAP_WRITE_BIT);
-	if (v)
-	{
-		memcpy (v, val, length);
-		glUnmapBuffer (target);
-	}
-	nng_free (val, sz);
+	glUnmapBuffer (GL_PIXEL_UNPACK_BUFFER);  // release pointer to mapping buffer
 }
+
+
 
 
 
