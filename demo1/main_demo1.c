@@ -53,6 +53,7 @@ enum main_glprogram
 	MAIN_GLPROGRAM_STARNDARD,
 	MAIN_GLPROGRAM_POINTCLOUD,
 	MAIN_GLPROGRAM_VOXEL,
+	MAIN_GLPROGRAM_LINE,
 	MAIN_GLPROGRAM_COUNT
 };
 
@@ -74,10 +75,12 @@ enum main_gltex
 enum main_nngsock
 {
 	MAIN_NNGSOCK_POINTCLOUD,
+	MAIN_NNGSOCK_POINTCLOUD_COLOR,
 	MAIN_NNGSOCK_PLANE,
 	MAIN_NNGSOCK_TEX,
 	MAIN_NNGSOCK_VOXEL,
 	MAIN_NNGSOCK_GROUND,
+	MAIN_NNGSOCK_LINES,
 	MAIN_NNGSOCK_COUNT
 };
 
@@ -151,17 +154,22 @@ int main (int argc, char * argv[])
 	glBindAttribLocation (gprogram[MAIN_GLPROGRAM_POINTCLOUD], main_glattr_col, "col" );
 	glLinkProgram (gprogram[MAIN_GLPROGRAM_POINTCLOUD]);
 
+	char const * shaderfiles2[] = {"../demo1/line.glvs", "../demo1/line.glfs", NULL};
+	gprogram[MAIN_GLPROGRAM_LINE] = csc_gl_program_from_files (shaderfiles2);
+	glBindAttribLocation (gprogram[MAIN_GLPROGRAM_LINE], main_glattr_pos, "pos" );
+	glBindAttribLocation (gprogram[MAIN_GLPROGRAM_LINE], main_glattr_col, "col" );
+	glLinkProgram (gprogram[MAIN_GLPROGRAM_LINE]);
 
-	char const * shaderfiles2[] = {"../demo1/standard.glvs", "../demo1/standard.glfs", NULL};
-	gprogram[MAIN_GLPROGRAM_STARNDARD] = csc_gl_program_from_files (shaderfiles2);
+	char const * shaderfiles3[] = {"../demo1/standard.glvs", "../demo1/standard.glfs", NULL};
+	gprogram[MAIN_GLPROGRAM_STARNDARD] = csc_gl_program_from_files (shaderfiles3);
 	glBindAttribLocation (gprogram[MAIN_GLPROGRAM_STARNDARD], main_glattr_pos, "pos" );
 	glBindAttribLocation (gprogram[MAIN_GLPROGRAM_STARNDARD], main_glattr_col, "col" );
 	glBindAttribLocation (gprogram[MAIN_GLPROGRAM_STARNDARD], main_glattr_tex, "tex" );
 	glLinkProgram (gprogram[MAIN_GLPROGRAM_STARNDARD]);
 
 
-	char const * shaderfiles3[] = {"../demo1/voxel.glvs", "../demo1/voxel.glfs", NULL};
-	gprogram[MAIN_GLPROGRAM_VOXEL] = csc_gl_program_from_files (shaderfiles3);
+	char const * shaderfiles4[] = {"../demo1/voxel.glvs", "../demo1/voxel.glfs", NULL};
+	gprogram[MAIN_GLPROGRAM_VOXEL] = csc_gl_program_from_files (shaderfiles4);
 	glBindAttribLocation (gprogram[MAIN_GLPROGRAM_VOXEL], main_glattr_pos, "pos" );
 	glLinkProgram (gprogram[MAIN_GLPROGRAM_VOXEL]);
 
@@ -202,7 +210,7 @@ int main (int argc, char * argv[])
 	mesh_groundprojection.texture = gtexture[MAIN_GLTEX_0];
 	demo_mesh_rectangle_init (&mesh_groundprojection, 1.0f);
 	m4f32_scale_xyz (mesh_groundprojection.model, VOX_XN*VOX_SCALE/2, VOX_YN*VOX_SCALE/2, 1.0f);
-	m4f32_translation_xyz (mesh_groundprojection.model, VOX_XN*VOX_SCALE/2, 0.0f, -0.3f);
+	m4f32_translation_xyz (mesh_groundprojection.model, VOX_XN*VOX_SCALE/2, 0.0f, -0.7f);
 
 	struct demo_mesh_rectangle mesh_chess = {0};
 	mesh_chess.cap = 6;
@@ -211,7 +219,7 @@ int main (int argc, char * argv[])
 	mesh_chess.texture = gtexture[MAIN_GLTEX_BW];
 	demo_mesh_rectangle_init (&mesh_chess, 10.0f);
 	m4f32_scale (mesh_chess.model, 10.0f);
-	m4f32_translation_xyz (mesh_chess.model, 0.0f, 0.0f, -0.4f);
+	m4f32_translation_xyz (mesh_chess.model, 0.0f, 0.0f, -0.8f);
 
 
 
@@ -228,6 +236,14 @@ int main (int argc, char * argv[])
 	mvoxel.program = gprogram[MAIN_GLPROGRAM_VOXEL];
 	mvoxel.texture_pallete = gtexture[MAIN_GLTEX_RGBA256];
 	demo_mesh_voxel_init (&mvoxel);
+
+
+	struct demo_mesh_lines mlines = {0};
+	mlines.cap = 100;
+	mlines.program = gprogram[MAIN_GLPROGRAM_LINE];
+	mlines.uniform_mvp = glGetUniformLocation (gprogram[MAIN_GLPROGRAM_LINE], "mvp");
+	demo_mesh_lines_init (&mlines);
+
 
 	uint8_t voxel[VOX_XN*VOX_YN*VOX_ZN] = {0};
 	/*
@@ -249,9 +265,11 @@ int main (int argc, char * argv[])
 
 
 	pair_listen (sock + MAIN_NNGSOCK_POINTCLOUD, "tcp://:9002");
+	pair_listen (sock + MAIN_NNGSOCK_POINTCLOUD_COLOR, "tcp://:9003");
 	//pair_listen (sock + MAIN_NNGSOCK_PLANE, "tcp://:9003");
 	pair_listen (sock + MAIN_NNGSOCK_TEX, "tcp://:9004");
 	pair_listen (sock + MAIN_NNGSOCK_VOXEL, "tcp://:9005");
+	pair_listen (sock + MAIN_NNGSOCK_LINES, "tcp://:9006");
 
 	uint8_t rgb256[MESH_VOXEL_PALLETE_WHC];
 	for (int i = 0; i < MESH_VOXEL_PALLETE_WHC; ++i)
@@ -333,13 +351,13 @@ int main (int argc, char * argv[])
 
 		{
 			//Camera:
-			cam.d [0] = 0.1f*(keyboard [SDL_SCANCODE_A] - keyboard [SDL_SCANCODE_D]);
-			cam.d [1] = 0.1f*(keyboard [SDL_SCANCODE_LCTRL] - keyboard [SDL_SCANCODE_SPACE]);
-			cam.d [2] = 0.1f*(keyboard [SDL_SCANCODE_W] - keyboard [SDL_SCANCODE_S]);
+			cam.d [0] = 0.01f*(keyboard [SDL_SCANCODE_A] - keyboard [SDL_SCANCODE_D]);
+			cam.d [1] = 0.01f*(keyboard [SDL_SCANCODE_LCTRL] - keyboard [SDL_SCANCODE_SPACE]);
+			cam.d [2] = 0.01f*(keyboard [SDL_SCANCODE_W] - keyboard [SDL_SCANCODE_S]);
 			cam.d [3] = 0;
 			cam.pitchd = 0.01f * (keyboard [SDL_SCANCODE_DOWN] - keyboard [SDL_SCANCODE_UP]);
 			cam.yawd = 0.01f * (keyboard [SDL_SCANCODE_RIGHT] - keyboard [SDL_SCANCODE_LEFT]);
-			cam.rolld = 0.01f * (keyboard [SDL_SCANCODE_Q] - keyboard [SDL_SCANCODE_E]);
+			cam.rolld = 0.01f * (keyboard [SDL_SCANCODE_E] - keyboard [SDL_SCANCODE_Q]);
 			csc_sdlcam_build (&cam);
 		}
 
@@ -348,20 +366,25 @@ int main (int argc, char * argv[])
 		glClear (GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
 
+		demo_mesh_rectangle_draw (&mesh_chess, cam.mvp);
+
 		// copy pixels from PBO to texture object
 		// Use offset instead of ponter
 		glBindTexture (GL_TEXTURE_2D, gtexture[MAIN_GLTEX_0]);
 		glBindBuffer (GL_PIXEL_UNPACK_BUFFER, pbo[MAIN_GLPBO_0]);
 		glTexSubImage2D (GL_TEXTURE_2D, 0, 0, 0, TEX_W, TEX_H, TEX_FORMAT, GL_UNSIGNED_BYTE, 0);
 		demo_mesh_rectangle_draw (&mesh_groundprojection, cam.mvp);
-		demo_mesh_rectangle_draw (&mesh_chess, cam.mvp);
 
 		demo_mesh_pointcloud_draw (&mpointcloud, cam.mvp);
 
 		demo_mesh_voxel_draw (&mvoxel, cam.mvp);
 
+		demo_mesh_lines_draw (&mlines, cam.mvp);
 
-		net_recv (sock[MAIN_NNGSOCK_POINTCLOUD], GL_ARRAY_BUFFER, mpointcloud.vbop, mpointcloud.cap, 0);
+
+		net_recv (sock[MAIN_NNGSOCK_POINTCLOUD], GL_ARRAY_BUFFER, mpointcloud.vbop, mpointcloud.cap*4*sizeof(float), 0);
+		net_recv (sock[MAIN_NNGSOCK_POINTCLOUD_COLOR], GL_ARRAY_BUFFER, mpointcloud.vboc, mpointcloud.cap*sizeof(uint32_t), 0);
+		net_recv (sock[MAIN_NNGSOCK_LINES], GL_ARRAY_BUFFER, mlines.vbop, mlines.cap*sizeof(uint32_t), 0);
 		//net_recv (sock[MAIN_NNGSOCK_PLANE], GL_ARRAY_BUFFER, mrectangletex.vbop, mrectangletex.cap, 0);
 		//net_recv (sock[MAIN_NNGSOCK_TEX], GL_PIXEL_UNPACK_BUFFER, pbo[MAIN_GLPBO_0], TEX_W*TEX_H*4, NET_RECV_DISCARD);
 		demo_mesh_voxel_update_from_socket (&mvoxel, VOX_XN, VOX_YN, VOX_ZN, sock[MAIN_NNGSOCK_VOXEL]);

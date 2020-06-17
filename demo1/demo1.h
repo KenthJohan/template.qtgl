@@ -31,7 +31,7 @@ void pair_listen (nng_socket * sock, char const * address)
 
 #define NET_RECV_DISCARD 0x01
 
-void net_recv (nng_socket sock, GLenum target, GLuint vbo, unsigned cap, int flag)
+void net_recv (nng_socket sock, GLenum target, GLuint vbo, unsigned size8, int flag)
 {
 	int rv;
 	size_t sz;
@@ -45,14 +45,14 @@ void net_recv (nng_socket sock, GLenum target, GLuint vbo, unsigned cap, int fla
 	{
 		NNG_EXIT_ON_ERROR (rv);
 	}
-	//printf ("New message %i\n", sz);
 	glBindBuffer (target, vbo);
-	GLsizeiptr length = MIN (cap * sizeof(float) * 4, sz);
+	GLsizeiptr length = MIN (size8, sz);
+	printf ("New message %i %i\n", size8, sz);
 	if (flag & NET_RECV_DISCARD)
 	{
 		glBufferData (GL_PIXEL_UNPACK_BUFFER, length, 0, GL_STREAM_DRAW);
 	}
-	float * v = glMapBufferRange (GL_ARRAY_BUFFER, 0, length, GL_MAP_WRITE_BIT);
+	void * v = glMapBufferRange (GL_ARRAY_BUFFER, 0, length, GL_MAP_WRITE_BIT);
 	if (v)
 	{
 		memcpy (v, val, length);
@@ -121,6 +121,16 @@ struct demo_mesh_voxel
 	float model[4*4];
 };
 
+struct demo_mesh_lines
+{
+	unsigned cap;
+	GLuint vao;
+	GLuint vbop;
+	GLuint vboc;
+	GLuint program;
+	GLuint uniform_mvp;
+};
+
 
 static void demo_mesh_pointcloud_init (struct demo_mesh_pointcloud * m)
 {
@@ -137,13 +147,11 @@ static void demo_mesh_pointcloud_init (struct demo_mesh_pointcloud * m)
 	glEnableVertexAttribArray (main_glattr_pos);
 
 	glBindBuffer(GL_ARRAY_BUFFER, m->vboc);
-	glBufferData(GL_ARRAY_BUFFER, m->cap*sizeof(float)*4, NULL, GL_STATIC_DRAW);
-	glVertexAttribPointer (main_glattr_col, 4, GL_FLOAT, GL_FALSE, 0, (void*)0);
+	glBufferData(GL_ARRAY_BUFFER, m->cap*sizeof(uint32_t), NULL, GL_STATIC_DRAW);
+	glVertexAttribPointer (main_glattr_col, 4, GL_UNSIGNED_BYTE, GL_TRUE, 0, (void*)0);
 	glEnableVertexAttribArray (main_glattr_col);
 
 	float * v;
-
-
 	glBindBuffer (GL_ARRAY_BUFFER, m->vbop);
 	v = glMapBufferRange (GL_ARRAY_BUFFER, 0, m->cap*sizeof(float)*4, GL_MAP_WRITE_BIT);
 	for (unsigned i = 0; i < m->cap; ++i)
@@ -158,14 +166,11 @@ static void demo_mesh_pointcloud_init (struct demo_mesh_pointcloud * m)
 
 
 	glBindBuffer (GL_ARRAY_BUFFER, m->vboc);
-	v = glMapBufferRange (GL_ARRAY_BUFFER, 0, m->cap*sizeof(float)*4, GL_MAP_WRITE_BIT);
+	uint32_t * c = glMapBufferRange (GL_ARRAY_BUFFER, 0, m->cap*sizeof(uint32_t), GL_MAP_WRITE_BIT);
 	for (unsigned i = 0; i < m->cap; ++i)
 	{
-		v[0] = 1.0f;
-		v[1] = 1.0f;
-		v[2] = 1.0f;
-		v[3] = 1.0f;
-		v += 4;
+		//       AABBGGRR
+		c[i] = 0xFFFFFFFF;
 	}
 	glUnmapBuffer (GL_ARRAY_BUFFER);
 }
@@ -271,6 +276,53 @@ static void demo_mesh_rectangle_draw (struct demo_mesh_rectangle * m, float * mv
 	glDrawArrays (GL_TRIANGLES, 0, m->cap);
 }
 
+
+
+static void demo_mesh_lines_init (struct demo_mesh_lines * m)
+{
+	glGenVertexArrays(1, &m->vao);
+	glGenBuffers(1, &m->vbop);
+	glGenBuffers(1, &m->vboc);
+
+	float const p[] =
+	{
+	-1.0f, -1.0f, 0.0f, 1.0f, // left, bottom
+	 1.0f, -1.0f, 0.0f, 1.0f, // right, bottom
+	 1.0f,  1.0f, 0.0f, 1.0f, // right, top
+	-1.0f, -1.0f, 0.0f, 1.0f, // left, bottom
+	 1.0f,  1.0f, 0.0f, 1.0f, // right, top
+	-1.0f,  1.0f, 0.0f, 1.0f  // left, top
+	};
+	float const c[] =
+	{
+	1.0f, 1.0f, 1.0f, 1.0f, // left, bottom
+	1.0f, 1.0f, 1.0f, 1.0f, // right, bottom
+	1.0f, 1.0f, 1.0f, 1.0f, // right, top
+	1.0f, 1.0f, 1.0f, 1.0f, // left, bottom
+	1.0f, 1.0f, 1.0f, 1.0f, // right, top
+	1.0f, 1.0f, 1.0f, 1.0f  // left, top
+	};
+
+	glBindVertexArray (m->vao);
+
+	glBindBuffer (GL_ARRAY_BUFFER, m->vbop);
+	glBufferData (GL_ARRAY_BUFFER, m->cap*sizeof(float)*4, p, GL_STATIC_DRAW);
+	glVertexAttribPointer (main_glattr_pos, 4, GL_FLOAT, GL_FALSE, 0, (void*)0);
+	glEnableVertexAttribArray (main_glattr_pos);
+
+	glBindBuffer (GL_ARRAY_BUFFER, m->vboc);
+	glBufferData (GL_ARRAY_BUFFER, m->cap*sizeof(float)*4, c, GL_STATIC_DRAW);
+	glVertexAttribPointer (main_glattr_col, 4, GL_FLOAT, GL_FALSE, 0, (void*)0);
+	glEnableVertexAttribArray (main_glattr_col);
+}
+
+static void demo_mesh_lines_draw (struct demo_mesh_lines * m, float * mvp)
+{
+	glUseProgram (m->program);
+	glUniformMatrix4fv (m->uniform_mvp, 1, GL_FALSE, (const GLfloat *) mvp);
+	glBindVertexArray (m->vao);
+	glDrawArrays (GL_LINES, 0, m->cap);
+}
 
 
 
