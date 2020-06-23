@@ -218,12 +218,12 @@ static void demo_mesh_rectangle_init (struct demo_mesh_rectangle * m, float uv)
 
 	float const p[] =
 	{
-	-1.0f, -1.0f, 0.0f, 1.0f, // left, bottom
-	 1.0f, -1.0f, 0.0f, 1.0f, // right, bottom
-	 1.0f,  1.0f, 0.0f, 1.0f, // right, top
-	-1.0f, -1.0f, 0.0f, 1.0f, // left, bottom
-	 1.0f,  1.0f, 0.0f, 1.0f, // right, top
-	-1.0f,  1.0f, 0.0f, 1.0f  // left, top
+	-0.5f, -0.5f, 0.0f, 1.0f, // left, bottom
+	 0.5f, -0.5f, 0.0f, 1.0f, // right, bottom
+	 0.5f,  0.5f, 0.0f, 1.0f, // right, top
+	-0.5f, -0.5f, 0.0f, 1.0f, // left, bottom
+	 0.5f,  0.5f, 0.0f, 1.0f, // right, top
+	-0.5f,  0.5f, 0.0f, 1.0f  // left, top
 	};
 	float const c[] =
 	{
@@ -241,7 +241,7 @@ static void demo_mesh_rectangle_init (struct demo_mesh_rectangle * m, float uv)
 	uv, uv, // right, top
 	0.0f, 0.0f, // left, bottom
 	uv, uv, // right, top
-	0.0f, uv  // left, top
+	0.0f, uv,  // left, top
 	};
 
 	glBindVertexArray (m->vao);
@@ -284,35 +284,16 @@ static void demo_mesh_lines_init (struct demo_mesh_lines * m)
 	glGenBuffers(1, &m->vbop);
 	glGenBuffers(1, &m->vboc);
 
-	float const p[] =
-	{
-	-1.0f, -1.0f, 0.0f, 1.0f, // left, bottom
-	 1.0f, -1.0f, 0.0f, 1.0f, // right, bottom
-	 1.0f,  1.0f, 0.0f, 1.0f, // right, top
-	-1.0f, -1.0f, 0.0f, 1.0f, // left, bottom
-	 1.0f,  1.0f, 0.0f, 1.0f, // right, top
-	-1.0f,  1.0f, 0.0f, 1.0f  // left, top
-	};
-	float const c[] =
-	{
-	1.0f, 1.0f, 1.0f, 1.0f, // left, bottom
-	1.0f, 1.0f, 1.0f, 1.0f, // right, bottom
-	1.0f, 1.0f, 1.0f, 1.0f, // right, top
-	1.0f, 1.0f, 1.0f, 1.0f, // left, bottom
-	1.0f, 1.0f, 1.0f, 1.0f, // right, top
-	1.0f, 1.0f, 1.0f, 1.0f  // left, top
-	};
-
 	glBindVertexArray (m->vao);
 
 	glBindBuffer (GL_ARRAY_BUFFER, m->vbop);
-	glBufferData (GL_ARRAY_BUFFER, m->cap*sizeof(float)*4, p, GL_STATIC_DRAW);
+	glBufferData (GL_ARRAY_BUFFER, m->cap*sizeof(float)*4, NULL, GL_STATIC_DRAW);
 	glVertexAttribPointer (main_glattr_pos, 4, GL_FLOAT, GL_FALSE, 0, (void*)0);
 	glEnableVertexAttribArray (main_glattr_pos);
 
-	glBindBuffer (GL_ARRAY_BUFFER, m->vboc);
-	glBufferData (GL_ARRAY_BUFFER, m->cap*sizeof(float)*4, c, GL_STATIC_DRAW);
-	glVertexAttribPointer (main_glattr_col, 4, GL_FLOAT, GL_FALSE, 0, (void*)0);
+	glBindBuffer(GL_ARRAY_BUFFER, m->vboc);
+	glBufferData(GL_ARRAY_BUFFER, m->cap*sizeof(uint32_t), NULL, GL_STATIC_DRAW);
+	glVertexAttribPointer (main_glattr_col, 4, GL_UNSIGNED_BYTE, GL_TRUE, 0, (void*)0);
 	glEnableVertexAttribArray (main_glattr_col);
 }
 
@@ -544,12 +525,12 @@ static void net_update_texture (nng_socket sock, GLuint pbo, uint32_t size8)
 	GLubyte * ptr = (GLubyte*)glMapBufferRange (GL_PIXEL_UNPACK_BUFFER, 0, size8, GL_MAP_WRITE_BIT);
 	ASSERT (ptr);
 
-	/*
+
 	for (uint32_t i = 0; i < size8; ++i)
 	{
-		ptr[i] = rand();
+		//ptr[i] = rand();
 	}
-	*/
+
 	//glUnmapBuffer (GL_PIXEL_UNPACK_BUFFER);
 	//return;
 
@@ -580,9 +561,90 @@ static void net_update_texture (nng_socket sock, GLuint pbo, uint32_t size8)
 }
 
 
+struct rendering_context
+{
+	uint32_t vao_cap;
+	uint32_t vbo_cap;
+	uint32_t pbo_cap;
+	uint32_t tex_cap;
+	uint32_t program_cap;
+	uint32_t * vao;
+	uint32_t * vbo;
+	uint32_t * pbo;
+	uint32_t * tex;
+	uint32_t * program;
+	char const ** program_files;
+};
+
+
+void rendering_context_init (struct rendering_context * ctx)
+{
+	//ASSERT (sizeof (uint32_t) == sizeof (GLuint));
+	ASSERT (ctx->vao_cap >= 1);
+	ASSERT (ctx->vbo_cap >= 1);
+	ASSERT (ctx->pbo_cap >= 1);
+	ASSERT (ctx->tex_cap >= 1);
+	ASSERT (ctx->program_cap >= 1);
+	ctx->vao = calloc (ctx->vao_cap, sizeof (uint32_t));
+	ctx->vbo = calloc (ctx->vbo_cap, sizeof (uint32_t));
+	ctx->pbo = calloc (ctx->pbo_cap, sizeof (uint32_t));
+	ctx->tex = calloc (ctx->tex_cap, sizeof (uint32_t));
+	ctx->program = calloc (ctx->program_cap, sizeof (uint32_t));
+	ctx->program_files = calloc (ctx->program_cap, sizeof (char*));
+	glGenVertexArrays (ctx->vao_cap - 1, ctx->vao + 1);
+	glGenBuffers (ctx->vbo_cap - 1, ctx->vbo + 1);
+	glGenBuffers (ctx->pbo_cap - 1, ctx->pbo + 1);
+	glGenTextures (ctx->tex_cap - 1, ctx->tex + 1);
+	for (uint32_t i = 0; i < ctx->vao_cap; ++i)
+	{
+		printf ("VAO: %i\n", ctx->vao[i]);
+	}
+	for (uint32_t i = 0; i < ctx->vbo_cap; ++i)
+	{
+		printf ("VBO: %i\n", ctx->vbo[i]);
+	}
+	for (uint32_t i = 0; i < ctx->pbo_cap; ++i)
+	{
+		printf ("PBO: %i\n", ctx->pbo[i]);
+	}
+	for (uint32_t i = 0; i < ctx->tex_cap; ++i)
+	{
+		printf ("Tex: %i\n", ctx->tex[i]);
+	}
+}
+
+
+void rendering_context_program_compile (struct rendering_context * ctx)
+{
+	//Start at index=1 because index=0 is reserved for default program shader:
+	for (uint32_t i = 1; i < ctx->program_cap; ++i)
+	{
+		ctx->program[i] = csc_gl_program_from_files1 (ctx->program_files[i]);
+	}
+	for (uint32_t i = 1; i < ctx->program_cap; ++i)
+	{
+		printf ("Link OpenGL program %s\n", ctx->program_files[i]);
+		glLinkProgram (ctx->program[i]);
+	}
+}
 
 
 
+struct demo_texture
+{
+	uint32_t w;
+	uint32_t h;
+	uint32_t format;
+	uint32_t type;
+	uint32_t tex;
+	uint32_t pbo;
+};
 
+void demo_texture (struct demo_texture * t)
+{
+	glBindTexture (GL_TEXTURE_2D, t->tex);
+	glBindBuffer (GL_PIXEL_UNPACK_BUFFER, t->pbo);
+	glTexSubImage2D (GL_TEXTURE_2D, 0, 0, 0, t->w, t->h, t->format, t->type, 0);
+};
 
 
