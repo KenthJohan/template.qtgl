@@ -43,8 +43,8 @@
 #define VOX_I(x,y,z) ((z)*VOX_XN*VOX_YN + (y)*VOX_XN + (x))
 #define VOX_SCALE 0.15f
 
-#define IMG_XN 10
-#define IMG_YN 100
+#define IMG_XN 20
+#define IMG_YN 120
 #define IMG_CN 4
 #define TEX_FORMAT GL_RGBA
 
@@ -173,41 +173,37 @@ int main (int argc, char * argv[])
 	rendering_context_program_compile (&ctx);
 
 
+	struct dd_img3d img_voxel;
+	struct dd_img2d img_chess;
+	struct dd_img2d img_0;
 
-	nng_socket sock[MAIN_NNGSOCK_COUNT];
+	img_voxel.w = VOX_XN;
+	img_voxel.h = VOX_YN;
+	img_voxel.d = VOX_ZN;
 
-	glBindBuffer (GL_PIXEL_UNPACK_BUFFER, ctx.pbo[MAIN_GLPBO_0]);
-	glBufferData (GL_PIXEL_UNPACK_BUFFER, IMG_XN*IMG_YN*4, 0, GL_STREAM_DRAW);
-	glBindBuffer (GL_PIXEL_UNPACK_BUFFER, ctx.pbo[MAIN_GLPBO_1]);
-	glBufferData (GL_PIXEL_UNPACK_BUFFER, IMG_XN*IMG_YN*4, 0, GL_STREAM_DRAW);
-	glBindBuffer (GL_PIXEL_UNPACK_BUFFER, 0);
+	img_chess.w = 2;
+	img_chess.h = 2;
+	img_chess.type = GL_UNSIGNED_BYTE;
+	img_chess.format = GL_RGBA;
+
+	img_0.w = IMG_XN;
+	img_0.h = IMG_YN;
+	img_0.type = GL_UNSIGNED_BYTE;
+	img_0.format = GL_RGBA;
 
 
-	glBindTexture (GL_TEXTURE_2D, ctx.tex[MAIN_GLTEX_0]);
-	glTexParameteri (GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_REPEAT);
-	glTexParameteri (GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_REPEAT);
-	glTexParameteri (GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
-	glTexParameteri (GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
-	glTexImage2D (GL_TEXTURE_2D, 0, GL_RGBA, IMG_XN, IMG_YN, 0, TEX_FORMAT, GL_UNSIGNED_BYTE, NULL);
-	glGenerateMipmap (GL_TEXTURE_2D);
 
-	glBindTexture (GL_TEXTURE_2D, ctx.tex[MAIN_GLTEX_BW]);
-	glTexParameteri (GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_REPEAT);
-	glTexParameteri (GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_REPEAT);
-	glTexParameteri (GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
-	glTexParameteri (GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
 	uint8_t bw[4*4] =
 	{
-	0x88, 0x88, 0x88, 0xAA,
-	0x55, 0x55, 0x55, 0xAA,
-	0x55, 0x55, 0x55, 0xAA,
-	0x88, 0x88, 0x88, 0xAA,
+	0x88, 0x88, 0x88, 0xAA,   0x55, 0x55, 0x55, 0xAA,
+	0x55, 0x55, 0x55, 0xAA,   0x88, 0x88, 0x88, 0xAA,
 	};
-	glTexImage2D (GL_TEXTURE_2D, 0, GL_RGBA, 2, 2, 0, GL_RGBA, GL_UNSIGNED_BYTE, bw);
-	glGenerateMipmap (GL_TEXTURE_2D);
+	dd_img2d_gl_allocate_tex (&img_chess, ctx.tex[MAIN_GLTEX_BW], bw);
+	dd_img2d_gl_allocate_tex (&img_0, ctx.tex[MAIN_GLTEX_0], NULL);
+	dd_img2d_gl_allocate_pbo (&img_0, ctx.pbo[MAIN_GLPBO_0], NULL);
+	dd_img2d_gl_allocate_pbo (&img_0, ctx.pbo[MAIN_GLPBO_1], NULL);
 
-
-
+	nng_socket sock[MAIN_NNGSOCK_COUNT];
 
 
 	struct demo_mesh_rectangle mesh_groundprojection = {0};
@@ -217,7 +213,7 @@ int main (int argc, char * argv[])
 	mesh_groundprojection.texture = ctx.tex[MAIN_GLTEX_0];
 	demo_mesh_rectangle_init (&mesh_groundprojection, 1.0f);
 	m4f32_scale_xyz (mesh_groundprojection.model, (float)IMG_XN/20.0f, (float)IMG_YN/20.0f, 1.0f);
-	m4f32_translation_xyz (mesh_groundprojection.model, 0.0f, 0.0f, -0.3f);
+	m4f32_translation_xyz (mesh_groundprojection.model, 0.0f, 0.0f, 0.0f);
 
 	struct demo_mesh_rectangle mesh_chess = {0};
 	mesh_chess.cap = 6;
@@ -250,6 +246,8 @@ int main (int argc, char * argv[])
 	mlines.program = ctx.program[MAIN_GLPROGRAM_LINE];
 	mlines.uniform_mvp = glGetUniformLocation (ctx.program[MAIN_GLPROGRAM_LINE], "mvp");
 	demo_mesh_lines_init (&mlines);
+
+
 
 
 	uint8_t voxel[VOX_XN*VOX_YN*VOX_ZN] = {0};
@@ -285,6 +283,13 @@ int main (int argc, char * argv[])
 	demo_mesh_voxel_texture_pallete (ctx.program[MAIN_GLPROGRAM_VOXEL], ctx.tex[MAIN_GLTEX_RGBA256], rgb256);
 
 
+	struct gl_mesh meshes[1];
+	meshes[0].vao = ctx.vao[MAIN_GLVAO_POINTCLOUD];
+	meshes[0].program = ctx.vao[MAIN_GLPROGRAM_POINTCLOUD];
+	m4f32_identity (meshes[0].model);
+	meshes[0].draw_from = 0;
+	meshes[0].draw_to = 0;
+	meshes[0].draw_mode = GL_POINTS;
 
 
 
@@ -371,20 +376,13 @@ int main (int argc, char * argv[])
 		glClearColor (0.2f, 0.3f, 0.3f, 1.0f);
 		glClear (GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
-
-
-
-		// copy pixels from PBO to texture object
-		// Use offset instead of ponter
-		glBindTexture (GL_TEXTURE_2D, ctx.tex[MAIN_GLTEX_0]);
-		glBindBuffer (GL_PIXEL_UNPACK_BUFFER, ctx.pbo[MAIN_GLPBO_0]);
-		glTexSubImage2D (GL_TEXTURE_2D, 0, 0, 0, IMG_XN, IMG_YN, TEX_FORMAT, GL_UNSIGNED_BYTE, 0);
+		dd_img2d_gl_copy_pbo_tex (&img_0, ctx.pbo[MAIN_GLPBO_0], ctx.tex[MAIN_GLTEX_0]);
 
 
 		//rendering_group_draw (&ctx, group, 1);
 
 		demo_mesh_pointcloud_draw (&mpointcloud, cam.mvp);
-		demo_mesh_voxel_draw (&mvoxel, cam.mvp);
+		//demo_mesh_voxel_draw (&mvoxel, cam.mvp);
 		demo_mesh_lines_draw (&mlines, cam.mvp);
 		demo_mesh_rectangle_draw (&mesh_chess, cam.mvp);
 		demo_mesh_rectangle_draw (&mesh_groundprojection, cam.mvp);

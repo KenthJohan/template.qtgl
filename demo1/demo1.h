@@ -153,7 +153,7 @@ static void demo_mesh_pointcloud_init (struct demo_mesh_pointcloud * m)
 
 	float * v;
 	glBindBuffer (GL_ARRAY_BUFFER, m->vbop);
-	v = glMapBufferRange (GL_ARRAY_BUFFER, 0, m->cap*sizeof(float)*4, GL_MAP_WRITE_BIT);
+	v = (float*)glMapBufferRange (GL_ARRAY_BUFFER, 0, m->cap*sizeof(float)*4, GL_MAP_WRITE_BIT);
 	for (unsigned i = 0; i < m->cap; ++i)
 	{
 		v[0] = ((float)rand() / (float)RAND_MAX) - 0.5f;
@@ -166,7 +166,7 @@ static void demo_mesh_pointcloud_init (struct demo_mesh_pointcloud * m)
 
 
 	glBindBuffer (GL_ARRAY_BUFFER, m->vboc);
-	uint32_t * c = glMapBufferRange (GL_ARRAY_BUFFER, 0, m->cap*sizeof(uint32_t), GL_MAP_WRITE_BIT);
+	uint32_t * c = (uint32_t*)glMapBufferRange (GL_ARRAY_BUFFER, 0, m->cap*sizeof(uint32_t), GL_MAP_WRITE_BIT);
 	for (unsigned i = 0; i < m->cap; ++i)
 	{
 		//       AABBGGRR
@@ -198,7 +198,7 @@ static void mesh_rectangle_set4pos (struct demo_mesh_rectangle * m, float const 
 	};
 	glBindBuffer (GL_ARRAY_BUFFER, m->vbop);
 	GLsizeiptr length = m->cap*sizeof(float)*4;
-	float * v = glMapBufferRange (GL_ARRAY_BUFFER, 0, length, GL_MAP_WRITE_BIT);
+	float * v = (float*)glMapBufferRange (GL_ARRAY_BUFFER, 0, length, GL_MAP_WRITE_BIT);
 	if (v)
 	{
 		ASSERT (sizeof (p) <= length);
@@ -396,7 +396,7 @@ static void demo_mesh_voxel_init (struct demo_mesh_voxel * m)
 	glVertexAttribPointer (1, 4,  GL_UNSIGNED_BYTE, GL_FALSE, 0, (void*)0);
 	glEnableVertexAttribArray (1);
 	GLsizeiptr length = m->cap*MESH_VOXEL_COUNT*sizeof(uint32_t);
-	uint32_t * v = glMapBufferRange (GL_ARRAY_BUFFER, 0, length, GL_MAP_WRITE_BIT);
+	uint32_t * v = (uint32_t*)glMapBufferRange (GL_ARRAY_BUFFER, 0, length, GL_MAP_WRITE_BIT);
 	if (v)
 	{
 		for (int i = 0; i < m->cap; ++i)
@@ -428,7 +428,7 @@ static void mesh_voxel_update (struct demo_mesh_voxel * m, uint8_t vox[], uint8_
 {
 	glBindBuffer (GL_ARRAY_BUFFER, m->vbop);
 	GLsizeiptr length = m->cap*MESH_VOXEL_COUNT*sizeof(uint32_t);
-	uint32_t * v = glMapBufferRange (GL_ARRAY_BUFFER, 0, length, GL_MAP_WRITE_BIT);
+	uint32_t * v = (uint32_t*)glMapBufferRange (GL_ARRAY_BUFFER, 0, length, GL_MAP_WRITE_BIT);
 	m->last = 0;
 	if (v)
 	{
@@ -585,12 +585,12 @@ void rendering_context_init (struct rendering_context * ctx)
 	ASSERT (ctx->pbo_cap >= 1);
 	ASSERT (ctx->tex_cap >= 1);
 	ASSERT (ctx->program_cap >= 1);
-	ctx->vao = calloc (ctx->vao_cap, sizeof (uint32_t));
-	ctx->vbo = calloc (ctx->vbo_cap, sizeof (uint32_t));
-	ctx->pbo = calloc (ctx->pbo_cap, sizeof (uint32_t));
-	ctx->tex = calloc (ctx->tex_cap, sizeof (uint32_t));
-	ctx->program = calloc (ctx->program_cap, sizeof (uint32_t));
-	ctx->program_files = calloc (ctx->program_cap, sizeof (char*));
+	ctx->vao = (uint32_t*)calloc (ctx->vao_cap, sizeof (uint32_t));
+	ctx->vbo = (uint32_t*)calloc (ctx->vbo_cap, sizeof (uint32_t));
+	ctx->pbo = (uint32_t*)calloc (ctx->pbo_cap, sizeof (uint32_t));
+	ctx->tex = (uint32_t*)calloc (ctx->tex_cap, sizeof (uint32_t));
+	ctx->program = (uint32_t*)calloc (ctx->program_cap, sizeof (uint32_t));
+	ctx->program_files = (char const**)calloc (ctx->program_cap, sizeof (char*));
 	glGenVertexArrays (ctx->vao_cap - 1, ctx->vao + 1);
 	glGenBuffers (ctx->vbo_cap - 1, ctx->vbo + 1);
 	glGenBuffers (ctx->pbo_cap - 1, ctx->pbo + 1);
@@ -646,5 +646,195 @@ void demo_texture (struct demo_texture * t)
 	glBindBuffer (GL_PIXEL_UNPACK_BUFFER, t->pbo);
 	glTexSubImage2D (GL_TEXTURE_2D, 0, 0, 0, t->w, t->h, t->format, t->type, 0);
 };
+
+
+
+
+
+struct gl_mesh
+{
+	uint32_t vao;
+	uint32_t program;
+	uint32_t uniform_mvp;
+	uint32_t tex_buffer;
+	uint32_t tex_location;
+	uint32_t tex_unit;
+	uint32_t draw_mode;
+	uint32_t draw_from;
+	uint32_t draw_to;
+	float model[4*4];
+};
+
+
+
+void gl_mesh_draw (struct gl_mesh * m, uint32_t n, float mvp[4*4])
+{
+	for (uint32_t i = 0; i < n; ++i, ++m)
+	{
+		glUseProgram (m->program);
+		glUniform1i (m->tex_location, m->tex_unit);
+		glActiveTexture (GL_TEXTURE0 + m->tex_unit);
+		glBindTexture (GL_TEXTURE_2D, m->tex_buffer);
+		float mmvp[4*4];
+		m4f32_mul (mmvp, mvp, m->model);
+		glUniformMatrix4fv (m->uniform_mvp, 1, GL_FALSE, (const GLfloat *) mmvp);
+		glBindVertexArray (m->vao);
+		glDrawArrays (m->draw_mode, m->draw_from, m->draw_to);
+	}
+}
+
+
+
+
+
+
+
+
+
+
+#define DD_IMG2D    1
+#define DD_IMG3D    2
+#define DD_VERTEX   3
+#define DD_MESH     4
+#define DD_STRING   5
+#define DD_DATA     6
+
+
+struct dd_img2d
+{
+	uint32_t w;
+	uint32_t h;
+	uint32_t format;
+	uint32_t type;
+	uint32_t n;
+};
+
+struct dd_img3d
+{
+	uint32_t w;
+	uint32_t h;
+	uint32_t d;
+	uint32_t format;
+	uint32_t type;
+	uint32_t n;
+};
+
+struct dd_vertex
+{
+	uint32_t dim;
+	uint32_t stride;
+	uint32_t type;
+	uint32_t n;
+};
+
+struct dd_mesh
+{
+	uint32_t tex;
+	uint32_t v;
+	uint32_t v0;
+	uint32_t v1;
+	uint32_t program;
+};
+
+
+
+void * dd_img2d_calloc (struct dd_img2d * img)
+{
+	return calloc (1, img->w * img->h);
+}
+
+
+void dd_img2d_gl_allocate_tex (struct dd_img2d * img, uint32_t texture, void * data)
+{
+	glBindTexture (GL_TEXTURE_2D, texture);
+	glTexParameteri (GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_REPEAT);
+	glTexParameteri (GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_REPEAT);
+	glTexParameteri (GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
+	glTexParameteri (GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+	glTexImage2D (GL_TEXTURE_2D, 0, GL_RGBA, img->w, img->h, 0, img->format, img->type, data);
+	glGenerateMipmap (GL_TEXTURE_2D);
+}
+
+
+void dd_img2d_gl_allocate_pbo (struct dd_img2d * img, uint32_t buffer, void * data)
+{
+	glBindBuffer (GL_PIXEL_UNPACK_BUFFER, buffer);
+	glBufferData (GL_PIXEL_UNPACK_BUFFER, img->w * img->h * 4, data, GL_STREAM_DRAW);
+	glBindBuffer (GL_PIXEL_UNPACK_BUFFER, 0);
+}
+
+
+void dd_img2d_gl_copy_pbo_tex (struct dd_img2d * img, uint32_t pbo, uint32_t tex)
+{
+	// copy pixels from PBO to texture object
+	// Use offset instead of ponter
+	glBindTexture (GL_TEXTURE_2D, tex);
+	glBindBuffer (GL_PIXEL_UNPACK_BUFFER, pbo);
+	glTexSubImage2D (GL_TEXTURE_2D, 0, 0, 0, img->w, img->h, img->format, GL_UNSIGNED_BYTE, 0);
+}
+
+
+
+
+
+struct ddtable
+{
+	uint32_t n;
+	uint32_t * type;
+	void ** data;
+};
+
+
+void ddtable_init (struct ddtable * t)
+{
+	t->type = (uint32_t *)calloc (t->n, sizeof (uint32_t));
+	t->data = (void **)calloc (t->n, sizeof (void *));
+}
+
+
+void ddtable_set_type (struct ddtable * t, uint32_t i, uint32_t type)
+{
+	ASSERT (i < t->n);
+	t->type[i] = type;
+}
+
+
+void ddtable_set_data (struct ddtable * t, uint32_t i, void * data)
+{
+	ASSERT (i < t->n);
+	t->data[i] = data;
+}
+
+
+void ddtable_gl_allocate (struct ddtable * t)
+{
+	for (uint32_t i = 0; i < t->n; ++i)
+	{
+		switch (t->type[i])
+		{
+		case DD_IMG2D:
+			dd_img2d_gl_allocate_tex ((struct dd_img2d*)t->data[i], 0, NULL);
+			break;
+		}
+	}
+}
+
+
+/*
+
+ 1  DD_IMG2D
+ 2  DATA
+ 3  DD_IMG2D
+ 4  DATA
+ 5  DD_VERTEX
+ 6  DATA
+ 7  DD_MESH
+ 8  DD_STRING
+ 9  DATA
+
+
+
+
+*/
 
 
