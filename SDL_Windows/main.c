@@ -1,8 +1,12 @@
+/*
+gcc main.c -I/c/msys64/mingw64/include -L/c/msys64/mingw64/lib -lmingw32 -lSDL2main -lSDL2 -mwindows -Wl,--no-undefined -Wl,--dynamicbase -Wl,--nxcompat -Wl,--high-entropy-va -lm -ldinput8 -ldxguid -ldxerr8 -luser32 -lgdi32 -lwinmm -limm32 -lole32 -loleaut32 -lshell32 -lsetupapi -lversion -luuid -static-libgcc
+*/
+
 #include <SDL2/SDL.h>
 #include <stdio.h>
 #include <stdint.h>
 #include <assert.h>
-#include <csc/debug.h>
+#include "../demo1/csc/csc_debug.h"
 
 #define WIN_X SDL_WINDOWPOS_UNDEFINED
 #define WIN_Y SDL_WINDOWPOS_UNDEFINED
@@ -12,6 +16,7 @@
 #define WIN_N 10
 
 #define APP_QUIT 0x01
+
 
 struct Application
 {
@@ -27,12 +32,13 @@ void XSDL_DestroyWindows (SDL_Window * window [], uint32_t n)
 	}
 }
 
-#define XSDL_Init(x) ASSERT_F(SDL_Init((x)) == 0, "There was an error initializing the SDL library: %s\n", SDL_GetError())
-#define XSDL_WaitEvent(x) ASSERT_F(SDL_WaitEvent((x)) == 0, "There was an error while waiting for events: %s\n", SDL_GetError())
-#define XSDL_ASSERT_CreateWindow(x) ASSERT_F((x) != NULL, "Could not create window: %s\n", SDL_GetError())
+#define XSDL_Init(x) ASSERTF(SDL_Init((x)) == 0, "There was an error initializing the SDL library: %s\n", SDL_GetError())
+#define XSDL_WaitEvent(x) ASSERTF(SDL_WaitEvent((x)) == 1, "There was an error while waiting for events: %s\n", SDL_GetError())
+#define XSDL_ASSERT_CreateWindow(x) ASSERTF((x) != NULL, "Could not create window: %s\n", SDL_GetError())
 
 int main (int argc, char * argv[])
 {
+	setbuf (stdout, NULL);
 
 	struct Application a = {0};
 	a.n = 1;
@@ -48,7 +54,9 @@ int main (int argc, char * argv[])
 	while (1)
 	{
 		if (flags & APP_QUIT) {break;}
+		//printf ("SDL_WaitEvent: %i\n", SDL_WaitEvent (&event));
 		XSDL_WaitEvent (&event);
+		SDL_Delay(100);
 		switch (event.type)
 		{
 		case SDL_KEYDOWN:
@@ -77,12 +85,13 @@ int main (int argc, char * argv[])
 			break;
 
 		case SDL_MOUSEMOTION:
-			printf ("%i %i\n", event.motion.x, event.motion.y);
+			//printf ("%i %i\n", event.motion.x, event.motion.y);
 			break;
 		}
 	}
 
 	XSDL_DestroyWindows (a.window, a.n);
 	SDL_Quit();
+
 	return 0;
 }
