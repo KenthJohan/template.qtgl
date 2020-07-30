@@ -47,7 +47,7 @@ void net_recv (nng_socket sock, GLenum target, GLuint vbo, unsigned size8, int f
 	}
 	glBindBuffer (target, vbo);
 	GLsizeiptr length = MIN (size8, sz);
-	printf ("New message %i %i\n", size8, sz);
+	printf ("New message %i %lli\n", size8, sz);
 	if (flag & NET_RECV_DISCARD)
 	{
 		glBufferData (GL_PIXEL_UNPACK_BUFFER, length, 0, GL_STREAM_DRAW);
@@ -201,7 +201,7 @@ static void mesh_rectangle_set4pos (struct demo_mesh_rectangle * m, float const 
 	float * v = (float*)glMapBufferRange (GL_ARRAY_BUFFER, 0, length, GL_MAP_WRITE_BIT);
 	if (v)
 	{
-		ASSERT (sizeof (p) <= length);
+		ASSERT ((GLsizeiptr)sizeof (p) <= length);
 		memcpy(v, p, sizeof (p));
 		glUnmapBuffer (GL_ARRAY_BUFFER);
 	}
@@ -399,7 +399,7 @@ static void demo_mesh_voxel_init (struct demo_mesh_voxel * m)
 	uint32_t * v = (uint32_t*)glMapBufferRange (GL_ARRAY_BUFFER, 0, length, GL_MAP_WRITE_BIT);
 	if (v)
 	{
-		for (int i = 0; i < m->cap; ++i)
+		for (uint32_t i = 0; i < m->cap; ++i)
 		{
 			mesh_voxel_barycentric (v);
 			v += MESH_VOXEL_COUNT;
@@ -467,7 +467,7 @@ static void demo_mesh_voxel_update_from_socket (struct demo_mesh_voxel * m, uint
 	{
 		NNG_EXIT_ON_ERROR (rv);
 	}
-	ASSERTF (sz == nx*ny*nz, "%ix%ix%i=%i, sz=%i", nx, ny, nz, nx*ny*nz, sz);
+	ASSERTF (sz == (size_t)nx*ny*nz, "%ix%ix%i=%i, sz=%i", nx, ny, nz, nx*ny*nz, sz);
 	mesh_voxel_update (m, val, nx, ny, nz);
 	nng_free (val, sz);
 }
@@ -721,6 +721,7 @@ struct dd_img3d
 
 struct dd_vertex
 {
+	uint32_t name;
 	uint32_t dim;
 	uint32_t stride;
 	uint32_t type;
@@ -773,6 +774,16 @@ void dd_img2d_gl_copy_pbo_tex (struct dd_img2d * img, uint32_t pbo, uint32_t tex
 	glTexSubImage2D (GL_TEXTURE_2D, 0, 0, 0, img->w, img->h, img->format, GL_UNSIGNED_BYTE, 0);
 }
 
+
+
+
+void dd_vertex_allocate (struct dd_vertex * vtx, uint32_t vbo, void * data)
+{
+	glBindBuffer (GL_ARRAY_BUFFER, vbo);
+	glBufferData (GL_ARRAY_BUFFER, vtx->n * vtx->stride, data, GL_STATIC_DRAW);
+	glVertexAttribPointer (vtx->name, vtx->dim, vtx->type, GL_FALSE, vtx->stride, (void*)0);
+	glEnableVertexAttribArray (vtx->name);
+}
 
 
 

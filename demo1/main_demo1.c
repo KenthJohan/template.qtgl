@@ -193,6 +193,7 @@ int main (int argc, char * argv[])
 
 
 
+
 	uint8_t bw[4*4] =
 	{
 	0x88, 0x88, 0x88, 0xAA,   0x55, 0x55, 0x55, 0xAA,
@@ -283,13 +284,7 @@ int main (int argc, char * argv[])
 	demo_mesh_voxel_texture_pallete (ctx.program[MAIN_GLPROGRAM_VOXEL], ctx.tex[MAIN_GLTEX_RGBA256], rgb256);
 
 
-	struct gl_mesh meshes[1];
-	meshes[0].vao = ctx.vao[MAIN_GLVAO_POINTCLOUD];
-	meshes[0].program = ctx.vao[MAIN_GLPROGRAM_POINTCLOUD];
-	m4f32_identity (meshes[0].model);
-	meshes[0].draw_from = 0;
-	meshes[0].draw_to = 0;
-	meshes[0].draw_mode = GL_POINTS;
+
 
 
 
