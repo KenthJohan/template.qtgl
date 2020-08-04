@@ -565,13 +565,9 @@ struct rendering_context
 {
 	uint32_t vao_cap;
 	uint32_t vbo_cap;
-	uint32_t pbo_cap;
-	uint32_t tex_cap;
 	uint32_t program_cap;
 	uint32_t * vao;
 	uint32_t * vbo;
-	uint32_t * pbo;
-	uint32_t * tex;
 	uint32_t * program;
 	char const ** program_files;
 };
@@ -582,19 +578,13 @@ void rendering_context_init (struct rendering_context * ctx)
 	//ASSERT (sizeof (uint32_t) == sizeof (GLuint));
 	ASSERT (ctx->vao_cap >= 1);
 	ASSERT (ctx->vbo_cap >= 1);
-	ASSERT (ctx->pbo_cap >= 1);
-	ASSERT (ctx->tex_cap >= 1);
 	ASSERT (ctx->program_cap >= 1);
 	ctx->vao = (uint32_t*)calloc (ctx->vao_cap, sizeof (uint32_t));
 	ctx->vbo = (uint32_t*)calloc (ctx->vbo_cap, sizeof (uint32_t));
-	ctx->pbo = (uint32_t*)calloc (ctx->pbo_cap, sizeof (uint32_t));
-	ctx->tex = (uint32_t*)calloc (ctx->tex_cap, sizeof (uint32_t));
 	ctx->program = (uint32_t*)calloc (ctx->program_cap, sizeof (uint32_t));
 	ctx->program_files = (char const**)calloc (ctx->program_cap, sizeof (char*));
 	glGenVertexArrays (ctx->vao_cap - 1, ctx->vao + 1);
 	glGenBuffers (ctx->vbo_cap - 1, ctx->vbo + 1);
-	glGenBuffers (ctx->pbo_cap - 1, ctx->pbo + 1);
-	glGenTextures (ctx->tex_cap - 1, ctx->tex + 1);
 	for (uint32_t i = 0; i < ctx->vao_cap; ++i)
 	{
 		printf ("VAO: %i\n", ctx->vao[i]);
@@ -602,14 +592,6 @@ void rendering_context_init (struct rendering_context * ctx)
 	for (uint32_t i = 0; i < ctx->vbo_cap; ++i)
 	{
 		printf ("VBO: %i\n", ctx->vbo[i]);
-	}
-	for (uint32_t i = 0; i < ctx->pbo_cap; ++i)
-	{
-		printf ("PBO: %i\n", ctx->pbo[i]);
-	}
-	for (uint32_t i = 0; i < ctx->tex_cap; ++i)
-	{
-		printf ("Tex: %i\n", ctx->tex[i]);
 	}
 }
 
@@ -685,6 +667,12 @@ void gl_mesh_draw (struct gl_mesh * m, uint32_t n, float mvp[4*4])
 
 
 
+
+
+struct ddgl_tex
+{
+	uint32_t pbo;
+};
 
 
 
@@ -831,6 +819,11 @@ void ddtable_gl_allocate (struct ddtable * t)
 }
 
 
+
+
+
+
+
 /*
 
  1  DD_IMG2D
@@ -847,5 +840,25 @@ void ddtable_gl_allocate (struct ddtable * t)
 
 
 */
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
