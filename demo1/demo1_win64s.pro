@@ -30,12 +30,14 @@ HEADERS += ray_triangle_intersect.h
 INCLUDEPATH += C:/msys64/mingw64/include
 LIBS += -LC:\msys64\mingw64\lib
 
-LIBS += -Wl,-Bstatic
-LIBS += -lmingw32 -lSDL2main -lSDL2 -mwindows -Wl,--no-undefined -Wl,--dynamicbase -Wl,--nxcompat -Wl,--high-entropy-va -lm -ldinput8 -ldxguid -ldxerr8 -luser32 -lgdi32 -lwinmm -limm32 -lole32 -loleaut32 -lshell32 -lsetupapi -lversion -luuid -static-libgcc
+#LIBS += -Wl,-Bstatic #Debugging with this flag causes "Command aborted"
+LIBS += -lmingw32 -lSDL2main -lSDL2 -mwindows -Wl,--no-undefined -Wl,--dynamicbase -Wl,--nxcompat -Wl,--high-entropy-va -lm -ldinput8 -ldxguid -ldxerr8 -luser32 -lgdi32 -lwinmm -limm32 -lole32 -loleaut32 -lshell32 -lsetupapi -lversion -luuid
+LIBS += -static-libgcc
 #LIBS += -Wl,-Bdynamic
 
 LIBS += -lglew32 -lopengl32
 
+#LIBS += -Wl,-Bstatic
 LIBS += -lnng
 LIBS += -lws2_32 -lmswsock -ladvapi32 -lkernel32 -luser32 -lgdi32 -lwinspool -lshell32 -lole32 -loleaut32 -luuid -lcomdlg32 -ladvapi32
 

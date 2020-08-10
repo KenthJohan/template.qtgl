@@ -20,25 +20,25 @@
 #include "demo1.h"
 
 
-#define GL_TBOINFO_MAX 10
-struct gl_tboinfo
+#define GL_TEXINFO_MAX 10
+struct gl_texinfo
 {
-	struct dd_img2d imginfo[GL_TBOINFO_MAX];
-	uint32_t tbo[GL_TBOINFO_MAX];
+	struct dd_img2d imginfo[GL_TEXINFO_MAX];
+	uint32_t tex[GL_TEXINFO_MAX];
 };
 
 
-void gl_tboinfo_init (struct gl_tboinfo * info)
+void gl_texinfo_init (struct gl_texinfo * info)
 {
-	glGenTextures (GL_TBOINFO_MAX, info->tbo);
+	glGenTextures (GL_TEXINFO_MAX, info->tex);
 }
 
 
-void gl_tboinfo_allocate (struct gl_tboinfo * info, uint32_t index, uint32_t w, uint32_t h, uint32_t format, uint32_t type, void * data)
+void gl_texinfo_allocate (struct gl_texinfo * info, uint32_t index, uint32_t w, uint32_t h, uint32_t format, uint32_t type, void * data)
 {
-	ASSERT (index < GL_TBOINFO_MAX);
-	uint32_t tbo = info->tbo[index];
-	if (index >= GL_TBOINFO_MAX)
+	ASSERT (index < GL_TEXINFO_MAX);
+	uint32_t tbo = info->tex[index];
+	if (index >= GL_TEXINFO_MAX)
 	{
 		printf ("gl_tboinfo_push max number of texture buffer object reached!");
 		return;
@@ -57,18 +57,18 @@ void gl_tboinfo_allocate (struct gl_tboinfo * info, uint32_t index, uint32_t w, 
 }
 
 
-void gl_tboinfo_cpy (struct gl_tboinfo * info, uint32_t index, uint32_t pbo)
+void gl_texinfo_cpy (struct gl_texinfo * info, uint32_t index, uint32_t pbo)
 {
-	// copy pixels from PBO to texture object
-	// Use offset instead of ponter
-	ASSERT (index < GL_TBOINFO_MAX);
-	uint32_t tbo = info->tbo[index];
-	uint32_t w = info->imginfo[index].w;
-	uint32_t h = info->imginfo[index].h;
+	ASSERT (index < GL_TEXINFO_MAX);
+	uint32_t tex    = info->tex[index];
+	uint32_t w      = info->imginfo[index].w;
+	uint32_t h      = info->imginfo[index].h;
 	uint32_t format = info->imginfo[index].format;
-	uint32_t type = info->imginfo[index].type;
-	glBindTexture (GL_TEXTURE_2D, tbo);
+	uint32_t type   = info->imginfo[index].type;
+	//Select texture destination (tex) and PBO source (pbo).
+	glBindTexture (GL_TEXTURE_2D, tex);
 	glBindBuffer (GL_PIXEL_UNPACK_BUFFER, pbo);
+	//Copy pixels from the bound pixel buffer object (pbo) to the bound texture object (tex)
 	glTexSubImage2D (GL_TEXTURE_2D, 0, 0, 0, w, h, format, type, 0);
 	glBindTexture (GL_TEXTURE_2D, 0);
 }

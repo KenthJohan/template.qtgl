@@ -18,6 +18,7 @@
 #include "demo1.h"
 #include "gl_pboinfo.h"
 #include "gl_tboinfo.h"
+#include "gl_meshinfo.h"
 
 #define WIN_X SDL_WINDOWPOS_UNDEFINED
 #define WIN_Y SDL_WINDOWPOS_UNDEFINED
@@ -95,7 +96,7 @@ enum main_nngsock
 	MAIN_NNGSOCK_POINTCLOUD_POS = 1,
 	MAIN_NNGSOCK_POINTCLOUD_COL,
 	MAIN_NNGSOCK_PLANE,
-	MAIN_NNGSOCK_TEX,
+	MAIN_NNGSOCK_GROUNDPROJECTION,
 	MAIN_NNGSOCK_VOXEL,
 	MAIN_NNGSOCK_GROUND,
 	MAIN_NNGSOCK_LINE_POS,
@@ -106,7 +107,12 @@ enum main_nngsock
 
 
 
-
+enum main_mesh
+{
+	MAIN_MESH_POINTCLOUD,
+	MAIN_MESH_AXIS,
+	MAIN_MESH_CHESS
+};
 
 
 
@@ -127,13 +133,19 @@ int main (int argc, char * argv[])
 		return 1;
 	}
 
+	//OpenGL rendering context is created before calling glewInit()
 	SDL_GLContext context = SDL_GL_CreateContext (window);
 	if (context == NULL)
 	{
 		fprintf (stderr, "Could not create SDL_GLContext: %s\n", SDL_GetError());
 		return 1;
 	}
+
+	//The glewExperimental global switch can be turned on by setting it to GL_TRUE before calling glewInit(),
+	//which ensures that all extensions with valid entry points will be exposed
 	glewExperimental = 1;
+
+	//First you need to create a valid OpenGL rendering context and call glewInit() to initialize the extension entry points
 	if (glewInit() != GLEW_OK)
 	{
 		fprintf(stderr, "Failed to setup GLEW\n");
@@ -178,15 +190,17 @@ int main (int argc, char * argv[])
 	0x88, 0x88, 0x88, 0xAA,   0x55, 0x55, 0x55, 0xAA,
 	0x55, 0x55, 0x55, 0xAA,   0x88, 0x88, 0x88, 0xAA,
 	};
+
+	//PBO provides a memory mapping mechanism to map the OpenGL controlled buffer object to the client's memory address space.
 	struct gl_pboinfo pboinfo;
 	gl_pboinfo_init (&pboinfo);
 	gl_pboinfo_allocate (&pboinfo, MAIN_GLPBO_CHESS, 2*2*4, chess);
 	gl_pboinfo_allocate (&pboinfo, MAIN_GLPBO_GROUNDPROJECTION, IMG_XN*IMG_YN*4, NULL);
 
-	struct gl_tboinfo tboinfo;
-	gl_tboinfo_init (&tboinfo);
-	gl_tboinfo_allocate (&tboinfo, MAIN_GLTEX_CHESS, 2, 2, GL_RGBA, GL_UNSIGNED_BYTE, NULL);
-	gl_tboinfo_allocate (&tboinfo, MAIN_GLTEX_GROUNDPROJECTION, IMG_XN, IMG_YN, GL_RGBA, GL_UNSIGNED_BYTE, NULL);
+	struct gl_texinfo texinfo;
+	gl_texinfo_init (&texinfo);
+	gl_texinfo_allocate (&texinfo, MAIN_GLTEX_CHESS, 2, 2, GL_RGBA, GL_UNSIGNED_BYTE, NULL);
+	gl_texinfo_allocate (&texinfo, MAIN_GLTEX_GROUNDPROJECTION, IMG_XN, IMG_YN, GL_RGBA, GL_UNSIGNED_BYTE, NULL);
 
 
 	nng_socket sock[MAIN_NNGSOCK_COUNT];
@@ -196,7 +210,7 @@ int main (int argc, char * argv[])
 	mesh_groundprojection.cap = 6;
 	mesh_groundprojection.uniform_mvp = glGetUniformLocation (ctx.program[MAIN_GLPROGRAM_STANDARD], "mvp");
 	mesh_groundprojection.program = ctx.program[MAIN_GLPROGRAM_STANDARD];
-	mesh_groundprojection.texture = tboinfo.tbo[1];
+	mesh_groundprojection.texture = texinfo.tex[1];
 	demo_mesh_rectangle_init (&mesh_groundprojection, 1.0f);
 	m4f32_scale_xyz (mesh_groundprojection.model, (float)IMG_XN/20.0f, (float)IMG_YN/20.0f, 1.0f);
 	m4f32_translation_xyz (mesh_groundprojection.model, 0.0f, 0.0f, 0.1f);
@@ -205,18 +219,44 @@ int main (int argc, char * argv[])
 	mesh_chess.cap = 6;
 	mesh_chess.uniform_mvp = glGetUniformLocation (ctx.program[MAIN_GLPROGRAM_STANDARD], "mvp");
 	mesh_chess.program = ctx.program[MAIN_GLPROGRAM_STANDARD];
-	mesh_chess.texture = tboinfo.tbo[0];
+	mesh_chess.texture = texinfo.tex[0];
 	demo_mesh_rectangle_init (&mesh_chess, 10.0f);
 	m4f32_scale (mesh_chess.model, 10.0f);
 	m4f32_translation_xyz (mesh_chess.model, 0.0f, 0.0f, 0.0f);
 
 
 
+	/*
 	struct demo_mesh_pointcloud mpointcloud = {0};
 	mpointcloud.cap = POINTC_W*POINTC_H;
 	mpointcloud.uniform_mvp = glGetUniformLocation (ctx.program[MAIN_GLPROGRAM_POINTCLOUD], "mvp");
 	mpointcloud.program = ctx.program[MAIN_GLPROGRAM_POINTCLOUD];
 	demo_mesh_pointcloud_init (&mpointcloud);
+	*/
+
+	struct gl_meshinfo meshes;
+	gl_meshinfo_init (&meshes);
+
+	gl_meshinfo_allocate (&meshes, MAIN_MESH_POINTCLOUD, POINTC_W*POINTC_H);
+	gl_meshinfo_allocate (&meshes, MAIN_MESH_AXIS, 18);
+	gl_meshinfo_allocate (&meshes, MAIN_MESH_CHESS, 6);
+
+	gl_meshinfo_example (&meshes, MAIN_MESH_POINTCLOUD);
+
+	gl_meshinfo_set_program (&meshes, MAIN_MESH_POINTCLOUD, ctx.program[MAIN_GLPROGRAM_POINTCLOUD]);
+	gl_meshinfo_set_program (&meshes, MAIN_MESH_AXIS, ctx.program[MAIN_GLPROGRAM_LINE]);
+	gl_meshinfo_set_program (&meshes, MAIN_MESH_CHESS, ctx.program[MAIN_GLPROGRAM_STANDARD]);
+
+	gl_meshinfo_set_uniform_mvp (&meshes, MAIN_MESH_POINTCLOUD, glGetUniformLocation (ctx.program[MAIN_GLPROGRAM_POINTCLOUD], "mvp"));
+	gl_meshinfo_set_uniform_mvp (&meshes, MAIN_MESH_AXIS, glGetUniformLocation (ctx.program[MAIN_GLPROGRAM_LINE], "mvp"));
+	gl_meshinfo_set_uniform_mvp (&meshes, MAIN_MESH_CHESS, glGetUniformLocation (ctx.program[MAIN_GLPROGRAM_STANDARD], "mvp"));
+
+	gl_meshinfo_set_drawmode (&meshes, MAIN_MESH_POINTCLOUD, GL_POINTS);
+	gl_meshinfo_set_drawmode (&meshes, MAIN_MESH_AXIS, GL_LINES);
+	gl_meshinfo_set_drawmode (&meshes, MAIN_MESH_CHESS, GL_TRIANGLES);
+
+	gl_meshinfo_set_texture (&meshes, MAIN_MESH_CHESS, texinfo.tex[0]);
+
 
 
 	/*
@@ -229,11 +269,13 @@ int main (int argc, char * argv[])
 	*/
 
 
+	/*
 	struct demo_mesh_lines mlines = {0};
 	mlines.cap = 18;
 	mlines.program = ctx.program[MAIN_GLPROGRAM_LINE];
 	mlines.uniform_mvp = glGetUniformLocation (ctx.program[MAIN_GLPROGRAM_LINE], "mvp");
 	demo_mesh_lines_init (&mlines);
+	*/
 
 
 
@@ -259,7 +301,7 @@ int main (int argc, char * argv[])
 	pair_listen (sock + MAIN_NNGSOCK_POINTCLOUD_POS, "tcp://:9002");
 	pair_listen (sock + MAIN_NNGSOCK_POINTCLOUD_COL, "tcp://:9003");
 	//pair_listen (sock + MAIN_NNGSOCK_PLANE, "tcp://:9003");
-	pair_listen (sock + MAIN_NNGSOCK_TEX, "tcp://:9004");
+	pair_listen (sock + MAIN_NNGSOCK_GROUNDPROJECTION, "tcp://:9004");
 	pair_listen (sock + MAIN_NNGSOCK_VOXEL, "tcp://:9005");
 	pair_listen (sock + MAIN_NNGSOCK_LINE_POS, "tcp://:9006");
 	pair_listen (sock + MAIN_NNGSOCK_LINE_COL, "tcp://:9007");
@@ -366,27 +408,34 @@ int main (int argc, char * argv[])
 
 		//rendering_group_draw (&ctx, group, 1);
 
-		gl_tboinfo_cpy (&tboinfo, MAIN_GLTEX_CHESS, pboinfo.pbo[MAIN_GLPBO_CHESS]);
-		gl_tboinfo_cpy (&tboinfo, MAIN_GLTEX_GROUNDPROJECTION, pboinfo.pbo[MAIN_GLPBO_GROUNDPROJECTION]);
+		gl_texinfo_cpy (&texinfo, MAIN_GLTEX_CHESS, pboinfo.pbo[MAIN_GLPBO_CHESS]);
+		gl_texinfo_cpy (&texinfo, MAIN_GLTEX_GROUNDPROJECTION, pboinfo.pbo[MAIN_GLPBO_GROUNDPROJECTION]);
 
-		demo_mesh_pointcloud_draw (&mpointcloud, cam.mvp);
+		//demo_mesh_pointcloud_draw (&mpointcloud, cam.mvp);
 		//demo_mesh_voxel_draw (&mvoxel, cam.mvp);
-		demo_mesh_lines_draw (&mlines, cam.mvp);
+		//demo_mesh_lines_draw (&mlines, cam.mvp);
+		gl_meshinfo_draw (&meshes, MAIN_MESH_AXIS, cam.mvp);
+		gl_meshinfo_draw (&meshes, MAIN_MESH_POINTCLOUD, cam.mvp);
 		demo_mesh_rectangle_draw (&mesh_chess, cam.mvp);
 		demo_mesh_rectangle_draw (&mesh_groundprojection, cam.mvp);
 
 
-		net_recv (sock[MAIN_NNGSOCK_POINTCLOUD_POS], GL_ARRAY_BUFFER, mpointcloud.vbop, mpointcloud.cap*4*sizeof(float), 0);
-		net_recv (sock[MAIN_NNGSOCK_POINTCLOUD_COL], GL_ARRAY_BUFFER, mpointcloud.vboc, mpointcloud.cap*sizeof(uint32_t), 0);
-		net_recv (sock[MAIN_NNGSOCK_LINE_POS], GL_ARRAY_BUFFER, mlines.vbop, mlines.cap*4*sizeof(float), 0);
-		net_recv (sock[MAIN_NNGSOCK_LINE_COL], GL_ARRAY_BUFFER, mlines.vboc, mlines.cap*sizeof(uint32_t), 0);
+
+		//net_recv (sock[MAIN_NNGSOCK_POINTCLOUD_POS], GL_ARRAY_BUFFER, mpointcloud.vbop, mpointcloud.cap*4*sizeof(float), 0);
+		//net_recv (sock[MAIN_NNGSOCK_POINTCLOUD_COL], GL_ARRAY_BUFFER, mpointcloud.vboc, mpointcloud.cap*sizeof(uint32_t), 0);
+		//net_recv (sock[MAIN_NNGSOCK_LINE_POS], GL_ARRAY_BUFFER, mlines.vbop, mlines.cap*4*sizeof(float), 0);
+		//net_recv (sock[MAIN_NNGSOCK_LINE_COL], GL_ARRAY_BUFFER, mlines.vboc, mlines.cap*sizeof(uint32_t), 0);
 		//net_recv (sock[MAIN_NNGSOCK_PLANE], GL_ARRAY_BUFFER, mrectangletex.vbop, mrectangletex.cap, 0);
 		//net_recv (sock[MAIN_NNGSOCK_TEX], GL_PIXEL_UNPACK_BUFFER, pbo[MAIN_GLPBO_0], TEX_W*TEX_H*4, NET_RECV_DISCARD);
 		//demo_mesh_voxel_update_from_socket (&mvoxel, VOX_XN, VOX_YN, VOX_ZN, sock[MAIN_NNGSOCK_VOXEL]);
 
-		gl_pboinfo_nng_recv (&pboinfo, 1, sock[MAIN_NNGSOCK_TEX]);
+		gl_pboinfo_nng_recv (&pboinfo, MAIN_GLPBO_GROUNDPROJECTION, sock[MAIN_NNGSOCK_GROUNDPROJECTION]);
 		//net_update_texture (sock[MAIN_NNGSOCK_TEX], ctx.pbo[MAIN_GLPBO_0], IMG_XN*IMG_YN*IMG_CN);
 		//gl_tboinfo_cpy (&tboinfo, 0, pboinfo.pbo[0]);
+
+		net_recv (sock[MAIN_NNGSOCK_POINTCLOUD_POS], GL_ARRAY_BUFFER, meshes.vbop[MAIN_MESH_POINTCLOUD], meshes.cap[MAIN_MESH_POINTCLOUD] * 4 * sizeof(float), 0);
+		net_recv (sock[MAIN_NNGSOCK_LINE_POS], GL_ARRAY_BUFFER, meshes.vbop[MAIN_MESH_AXIS], meshes.cap[MAIN_MESH_AXIS] * 4 * sizeof(float), 0);
+		net_recv (sock[MAIN_NNGSOCK_LINE_COL], GL_ARRAY_BUFFER, meshes.vboc[MAIN_MESH_AXIS], meshes.cap[MAIN_MESH_AXIS] * sizeof(uint32_t), 0);
 
 
 
