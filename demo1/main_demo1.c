@@ -187,8 +187,8 @@ int main (int argc, char * argv[])
 
 	uint8_t chess[4*4] =
 	{
-	0x88, 0x88, 0x88, 0xAA,   0x55, 0x55, 0x55, 0xAA,
-	0x55, 0x55, 0x55, 0xAA,   0x88, 0x88, 0x88, 0xAA,
+	0x88, 0x88, 0x88, 0x11,   0x55, 0x55, 0x55, 0x11,
+	0x55, 0x55, 0x55, 0x11,   0x88, 0x88, 0x88, 0x11,
 	};
 
 	//PBO provides a memory mapping mechanism to map the OpenGL controlled buffer object to the client's memory address space.
@@ -399,7 +399,7 @@ int main (int argc, char * argv[])
 		}
 
 
-		glClearColor (0.2f, 0.3f, 0.3f, 1.0f);
+		glClearColor (0.2f, 0.2f, 0.2f, 1.0f);
 		glClear (GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
 		//dd_img2d_gl_copy_pbo_tex (&img_0, ctx.pbo[MAIN_GLPBO_0], ctx.tex[MAIN_GLTEX_0]);
