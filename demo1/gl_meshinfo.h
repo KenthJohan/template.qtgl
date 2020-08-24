@@ -33,6 +33,7 @@ struct gl_meshinfo
 	uint32_t uniform_mvp[GL_MESHINFO_MAX];
 	uint32_t drawmode[GL_MESHINFO_MAX];
 	uint32_t texture[GL_MESHINFO_MAX];
+	float model[4*4*GL_MESHINFO_MAX];
 };
 
 
@@ -42,6 +43,10 @@ void gl_meshinfo_init (struct gl_meshinfo * info)
 	glGenBuffers (GL_MESHINFO_MAX, info->vbop);
 	glGenBuffers (GL_MESHINFO_MAX, info->vboc);
 	memset (info->cap, 0, GL_MESHINFO_MAX * sizeof (uint32_t));
+	for (float * m = info->model; m < info->model+4*4*GL_MESHINFO_MAX; m += 4*4)
+	{
+		m4f32_identity (m);
+	}
 }
 
 
@@ -108,6 +113,7 @@ void gl_meshinfo_draw (struct gl_meshinfo * info, uint32_t index, float const mv
 	uint32_t drawmode    = info->drawmode[index];
 	uint32_t uniform_mvp = info->uniform_mvp[index];
 	uint32_t cap         = info->cap[index];
+	float * model        = info->model + index*4*4;
 	glUseProgram (program);
 	glUniformMatrix4fv (uniform_mvp, 1, GL_FALSE, (GLfloat const *) mvp);
 	glBindVertexArray (vao);
