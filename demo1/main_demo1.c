@@ -237,7 +237,7 @@ int main (int argc, char * argv[])
 	struct gl_meshinfo meshes;
 	gl_meshinfo_init (&meshes);
 
-	gl_meshinfo_allocate (&meshes, MAIN_MESH_POINTCLOUD, POINTC_W*POINTC_H);
+	gl_meshinfo_allocate (&meshes, MAIN_MESH_POINTCLOUD, POINTC_W*POINTC_H*2);
 	gl_meshinfo_allocate (&meshes, MAIN_MESH_AXIS, 18);
 	gl_meshinfo_allocate (&meshes, MAIN_MESH_CHESS, 6);
 
@@ -414,8 +414,8 @@ int main (int argc, char * argv[])
 		//demo_mesh_pointcloud_draw (&mpointcloud, cam.mvp);
 		//demo_mesh_voxel_draw (&mvoxel, cam.mvp);
 		//demo_mesh_lines_draw (&mlines, cam.mvp);
-		gl_meshinfo_draw (&meshes, MAIN_MESH_AXIS, cam.mvp);
 		gl_meshinfo_draw (&meshes, MAIN_MESH_POINTCLOUD, cam.mvp);
+		gl_meshinfo_draw (&meshes, MAIN_MESH_AXIS, cam.mvp);
 		demo_mesh_rectangle_draw (&mesh_chess, cam.mvp);
 		demo_mesh_rectangle_draw (&mesh_groundprojection, cam.mvp);
 
