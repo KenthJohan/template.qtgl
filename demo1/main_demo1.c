@@ -9,7 +9,9 @@
 
 #include <SDL2/SDL.h>
 #include <GL/glew.h>
+
 #include <stdio.h>
+#include <unistd.h>//chdir()
 
 #include <nng/nng.h>
 #include <nng/protocol/pair0/pair.h>
@@ -122,6 +124,10 @@ int main (int argc, char * argv[])
 	ASSERT (argc);
 	ASSERT (argv);
 
+#ifdef USING_QT_CREATOR
+	chdir ("../demo1");
+#endif
+
 
 	uint32_t main_flags = MAIN_RUNNING;
 	SDL_Window * window;
@@ -178,10 +184,10 @@ int main (int argc, char * argv[])
 	ctx.vbo_cap = 1;
 	ctx.program_cap = MAIN_GLPROGRAM_COUNT;
 	rendering_context_init (&ctx);
-	ctx.program_files[MAIN_GLPROGRAM_POINTCLOUD] = "../demo1/pointcloud.glvs;../demo1/pointcloud.glfs";
-	ctx.program_files[MAIN_GLPROGRAM_LINE]       = "../demo1/line.glvs;../demo1/line.glfs";
-	ctx.program_files[MAIN_GLPROGRAM_STANDARD]   = "../demo1/standard.glvs;../demo1/standard.glfs";
-	ctx.program_files[MAIN_GLPROGRAM_VOXEL]      = "../demo1/voxel.glvs;../demo1/voxel.glfs";
+	ctx.program_files[MAIN_GLPROGRAM_POINTCLOUD] = "pointcloud.glvs;pointcloud.glfs";
+	ctx.program_files[MAIN_GLPROGRAM_LINE]       = "line.glvs;line.glfs";
+	ctx.program_files[MAIN_GLPROGRAM_STANDARD]   = "standard.glvs;standard.glfs";
+	ctx.program_files[MAIN_GLPROGRAM_VOXEL]      = "voxel.glvs;voxel.glfs";
 	rendering_context_program_compile (&ctx);
 
 
