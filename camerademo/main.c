@@ -7,6 +7,7 @@
 #include "csc/csc_sdl_motion.h"
 #include "csc/csc_gcam.h"
 #include "csc/csc_gl.h"
+#include "csc/csc_sdlglew.h"
 
 #define WIN_X SDL_WINDOWPOS_UNDEFINED
 #define WIN_Y SDL_WINDOWPOS_UNDEFINED
@@ -23,15 +24,7 @@ enum main_glattr
 	main_glattr_col
 };
 
-void shader_infolog (GLuint shader)
-{
-	GLint length = 0;
-	glGetShaderiv (shader, GL_INFO_LOG_LENGTH, &length);
-	char * info = malloc (sizeof(char) * length);
-	glGetShaderInfoLog (shader, length, NULL, info);
-	fputs (info, stderr);
-	free (info);
-}
+
 
 
 int main (int argc, char * argv[])
@@ -40,27 +33,9 @@ int main (int argc, char * argv[])
 	ASSERT (argv);
 	uint32_t main_flags = MAIN_RUNNING;
 	SDL_Window * window;
-	SDL_Init (SDL_INIT_VIDEO);
-	window = SDL_CreateWindow (WIN_TITLE, WIN_X, WIN_Y, WIN_W, WIN_H, SDL_WINDOW_OPENGL);
-	if (window == NULL)
-	{
-		printf("Could not create SDL_Window: %s\n", SDL_GetError());
-		return 1;
-	}
+	SDL_GLContext context;
 
-	SDL_GLContext context = SDL_GL_CreateContext (window);
-	if (context == NULL)
-	{
-		printf("Could not create SDL_GLContext: %s\n", SDL_GetError());
-		return 1;
-	}
-	GLenum err = glewInit();
-	if (GLEW_OK != err)
-	{
-		fprintf(stderr, "Error: %s\n", glewGetErrorString(err));
-	}
-	fprintf(stdout, "Status: Using GLEW %s\n", glewGetString(GLEW_VERSION));
-
+	csc_sdlglew_create_window (&window, &context, WIN_TITLE, WIN_X, WIN_Y, WIN_W, WIN_H, SDL_WINDOW_OPENGL);
 
 	const char * sharefiles[] = {CSC_SRCDIR"shader.glvs", CSC_SRCDIR"shader.glfs", NULL};
 	GLuint glprogram = csc_gl_program_from_files (sharefiles);
@@ -124,52 +99,13 @@ int main (int argc, char * argv[])
 
 	const Uint8 * keyboard = SDL_GetKeyboardState (NULL);
 
-	while (main_flags & MAIN_RUNNING)
+	while (main_flags & CSC_SDLGLEW_RUNNING)
 	{
-		SDL_Event Event;
-		while (SDL_PollEvent (&Event))
+		SDL_Event event;
+		while (SDL_PollEvent (&event))
 		{
-			if (Event.type == SDL_KEYDOWN)
-			{
-				switch (Event.key.keysym.sym)
-				{
-				case SDLK_ESCAPE:
-					main_flags &= ~MAIN_RUNNING;
-					break;
-
-				case 'f':
-					main_flags ^= MAIN_FULLSCREEN;
-					if (main_flags & MAIN_FULLSCREEN)
-					{
-						SDL_SetWindowFullscreen (window, SDL_WINDOW_OPENGL | SDL_WINDOW_FULLSCREEN_DESKTOP);
-					}
-					else
-					{
-						SDL_SetWindowFullscreen (window, SDL_WINDOW_OPENGL);
-					}
-					if(1)
-					{
-						int w;
-						int h;
-						SDL_GetWindowSize (window, &w, &h);
-						gcam.w = w;
-						gcam.h = h;
-						glViewport (0, 0, w, h);
-					}
-					break;
-					break;
-
-				default:
-					break;
-				}
-			}
-			else if (Event.type == SDL_QUIT)
-			{
-				main_flags &= ~MAIN_RUNNING;
-			}
+			csc_sdlglew_event_loop (window, &event, &main_flags, &gcam);
 		}
-
-
 
 		{
 			//Control graphics camera
@@ -180,7 +116,6 @@ int main (int argc, char * argv[])
 			csc_gcam_update (&gcam);
 			glUniformMatrix4fv (uniform_mvp, 1, GL_FALSE, (const GLfloat *) (gcam.mvp));
 		}
-
 
 		glClearColor (0.1f, 0.1f, 0.1f, 0.0f);
 		glClear (GL_COLOR_BUFFER_BIT);

@@ -26,9 +26,6 @@
 
 
 
-
-
-
 int main (int argc, char * argv[])
 {
 	csc_crossos_enable_ansi_color ();
