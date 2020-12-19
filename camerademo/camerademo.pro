@@ -3,13 +3,10 @@ CONFIG += console
 CONFIG -= app_bundle
 CONFIG -= qt
 
+#DEFINES += GLEW_STATIC
+DEFINES += CSC_SRCDIR=\\\"../camerademo/\\\"
 
 SOURCES += main.c
-SOURCES += glad.c
 
-HEADERS += glad.h
-HEADERS += khrplatform.h
-INCLUDEPATH += C:\msys64\mingw64\include
+LIBS += -lmingw32 -lSDL2main -lSDL2 -mwindows -lglew32 -lopengl32
 
-
-win32: LIBS += -LC:\msys64\mingw64\lib -lmingw32 -lSDL2main -lSDL2 -lopengl32

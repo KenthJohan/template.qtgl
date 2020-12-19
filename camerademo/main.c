@@ -1,11 +1,12 @@
 #include <SDL2/SDL.h>
 #include <stdio.h>
-#include <glad.h>
+#include <GL/glew.h>
 
 #include "csc/csc_debug.h"
 #include "csc/csc_malloc_file.h"
-#include "csc/csc_lin.h"
-#include "csc/csc_sdlcam.h"
+#include "csc/csc_sdl_motion.h"
+#include "csc/csc_gcam.h"
+#include "csc/csc_gl.h"
 
 #define WIN_X SDL_WINDOWPOS_UNDEFINED
 #define WIN_Y SDL_WINDOWPOS_UNDEFINED
@@ -35,6 +36,8 @@ void shader_infolog (GLuint shader)
 
 int main (int argc, char * argv[])
 {
+	ASSERT (argc);
+	ASSERT (argv);
 	uint32_t main_flags = MAIN_RUNNING;
 	SDL_Window * window;
 	SDL_Init (SDL_INIT_VIDEO);
@@ -51,43 +54,21 @@ int main (int argc, char * argv[])
 		printf("Could not create SDL_GLContext: %s\n", SDL_GetError());
 		return 1;
 	}
-	gladLoadGL();
+	GLenum err = glewInit();
+	if (GLEW_OK != err)
+	{
+		fprintf(stderr, "Error: %s\n", glewGetErrorString(err));
+	}
+	fprintf(stdout, "Status: Using GLEW %s\n", glewGetString(GLEW_VERSION));
 
-	char const * shader_vertex_source = csc_malloc_file ("../camerademo/shader.glvs");
-	char const * shader_fragment_source = csc_malloc_file ("../camerademo/shader.glfs");
-	//puts(shader_vertex_source);
-	//puts(shader_fragment_source);
-	GLuint shader_vs;
-	GLuint shader_fs;
-	GLuint shader_program;
-	shader_vs = glCreateShader (GL_VERTEX_SHADER);
-	shader_fs = glCreateShader (GL_FRAGMENT_SHADER);
-	glShaderSource (shader_vs, 1, (const GLchar **)&shader_vertex_source, NULL);
-	glShaderSource (shader_fs, 1, (const GLchar **)&shader_fragment_source, NULL);
-	glCompileShader (shader_vs);
-	glCompileShader (shader_fs);
-	GLint shader_status;
-	glGetShaderiv (shader_vs, GL_COMPILE_STATUS, &shader_status);
-	if (shader_status == GL_FALSE)
-	{
-		fprintf (stderr, "vertex shader compilation failed\n" );
-		shader_infolog (shader_vs);
-		return 1;
-	}
-	glGetShaderiv (shader_fs, GL_COMPILE_STATUS, &shader_status);
-	if (shader_status == GL_FALSE)
-	{
-		fprintf (stderr, "fragment shader compilation failed\n" );
-		shader_infolog (shader_fs);
-		return 1;
-	}
-	shader_program = glCreateProgram();
-	glAttachShader (shader_program, shader_vs);
-	glAttachShader (shader_program, shader_fs);
-	glBindAttribLocation (shader_program, main_glattr_pos, "pos" );
-	glBindAttribLocation (shader_program, main_glattr_col, "col" );
-	glLinkProgram (shader_program);
-	glUseProgram (shader_program);
+
+	const char * sharefiles[] = {CSC_SRCDIR"shader.glvs", CSC_SRCDIR"shader.glfs", NULL};
+	GLuint glprogram = csc_gl_program_from_files (sharefiles);
+	glBindAttribLocation (glprogram, main_glattr_pos, "pos" );
+	glBindAttribLocation (glprogram, main_glattr_col, "col" );
+	glLinkProgram (glprogram);
+	glUseProgram (glprogram);
+	GLuint uniform_mvp = glGetUniformLocation (glprogram, "mvp");
 
 	glDisable(GL_DEPTH_TEST);
 	glClearColor (0.5, 0.0, 0.0, 0.0 );
@@ -101,12 +82,13 @@ int main (int argc, char * argv[])
 	glEnableVertexAttribArray (main_glattr_pos);
 	glEnableVertexAttribArray (main_glattr_col);
 
+	//Define vertex data format for GPU:
 	glBindBuffer (GL_ARRAY_BUFFER, vbo[main_glattr_pos]);
 	glVertexAttribPointer (main_glattr_pos, 3, GL_FLOAT, GL_FALSE, 0, 0);
-
 	glBindBuffer (GL_ARRAY_BUFFER, vbo[main_glattr_col]);
 	glVertexAttribPointer (main_glattr_col, 4, GL_FLOAT, GL_FALSE, 0, 0);
 
+	//Defined a square of two triangles:
 	const GLfloat vertex_pos[] =
 	{
 	0.0f,     0.0f,     0.0f,
@@ -118,6 +100,7 @@ int main (int argc, char * argv[])
 	0.0f,     1.0f,     0.0f
 	};
 
+	//Set color of each cornder of triangles:
 	const GLfloat vertex_col[] =
 	{
 	1, 1, 0, 1,
@@ -129,18 +112,15 @@ int main (int argc, char * argv[])
 	1, 1, 1, 1,
 	};
 
+	//Store triangle positions and colors in GPU:
 	glBindBuffer (GL_ARRAY_BUFFER, vbo[main_glattr_pos]);
 	glBufferData (GL_ARRAY_BUFFER, sizeof(vertex_pos), vertex_pos, GL_STATIC_DRAW);
-
 	glBindBuffer (GL_ARRAY_BUFFER, vbo[main_glattr_col]);
 	glBufferData (GL_ARRAY_BUFFER, sizeof(vertex_col), vertex_col, GL_STATIC_DRAW);
 
-	GLuint uniform_mvp = glGetUniformLocation (shader_program, "mvp");
-
-
-
-	struct Camera camera;
-	camera_init (&camera, window);
+	struct csc_gcam gcam;
+	csc_gcam_init (&gcam);
+	v4f32_set_xyzw (gcam.p, 0.0f, 0.0f, -4.0f, 1.0f);
 
 	const Uint8 * keyboard = SDL_GetKeyboardState (NULL);
 
@@ -167,7 +147,16 @@ int main (int argc, char * argv[])
 					{
 						SDL_SetWindowFullscreen (window, SDL_WINDOW_OPENGL);
 					}
-					sdl_update_projection (window, camera.mp);
+					if(1)
+					{
+						int w;
+						int h;
+						SDL_GetWindowSize (window, &w, &h);
+						gcam.w = w;
+						gcam.h = h;
+						glViewport (0, 0, w, h);
+					}
+					break;
 					break;
 
 				default:
@@ -180,8 +169,17 @@ int main (int argc, char * argv[])
 			}
 		}
 
-		camera_update (&camera, keyboard);
-		glUniformMatrix4fv (uniform_mvp, 1, GL_FALSE, (const GLfloat *) (camera.mvp));
+
+
+		{
+			//Control graphics camera
+			csc_sdl_motion_wasd (keyboard, gcam.d);
+			csc_sdl_motion_pyr (keyboard, gcam.pyrd);
+			vsf32_mul (3, gcam.d, gcam.d, 0.01f);
+			vsf32_mul (3, gcam.pyrd, gcam.pyrd, 0.01f);
+			csc_gcam_update (&gcam);
+			glUniformMatrix4fv (uniform_mvp, 1, GL_FALSE, (const GLfloat *) (gcam.mvp));
+		}
 
 
 		glClearColor (0.1f, 0.1f, 0.1f, 0.0f);
