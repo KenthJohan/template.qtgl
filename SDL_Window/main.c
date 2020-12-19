@@ -14,11 +14,11 @@ int main (int argc, char * argv[])
 	window = SDL_CreateWindow (WIN_TITLE, WIN_X, WIN_Y, WIN_W, WIN_H, SDL_WINDOW_OPENGL);
 	if (window == NULL)
 	{
-		printf("Could not create window: %s\n", SDL_GetError());
+		printf ("Could not create window: %s\n", SDL_GetError());
 		return 1;
 	}
-	SDL_Delay(3000);
-	SDL_DestroyWindow(window);
-	SDL_Quit();
+	SDL_Delay (3000);
+	SDL_DestroyWindow (window);
+	SDL_Quit ();
 	return 0;
 }

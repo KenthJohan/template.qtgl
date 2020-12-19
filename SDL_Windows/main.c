@@ -6,7 +6,6 @@ gcc main.c -I/c/msys64/mingw64/include -L/c/msys64/mingw64/lib -lmingw32 -lSDL2m
 #include <stdio.h>
 #include <stdint.h>
 #include <assert.h>
-#include "../demo1/csc/csc_debug.h"
 
 #define WIN_X SDL_WINDOWPOS_UNDEFINED
 #define WIN_Y SDL_WINDOWPOS_UNDEFINED
@@ -24,18 +23,6 @@ struct Application
 	SDL_Window * window [WIN_N];
 };
 
-void XSDL_DestroyWindows (SDL_Window * window [], uint32_t n)
-{
-	for (uint32_t i = 0; i < n; i ++)
-	{
-		SDL_DestroyWindow (window [i]);
-	}
-}
-
-#define XSDL_Init(x) ASSERTF(SDL_Init((x)) == 0, "There was an error initializing the SDL library: %s\n", SDL_GetError())
-#define XSDL_WaitEvent(x) ASSERTF(SDL_WaitEvent((x)) == 1, "There was an error while waiting for events: %s\n", SDL_GetError())
-#define XSDL_ASSERT_CreateWindow(x) ASSERTF((x) != NULL, "Could not create window: %s\n", SDL_GetError())
-
 int main (int argc, char * argv[])
 {
 	setbuf (stdout, NULL);
@@ -44,18 +31,29 @@ int main (int argc, char * argv[])
 	a.n = 1;
 
 	uint32_t flags = 0;
-	XSDL_Init (SDL_INIT_VIDEO);
 
+
+	if (SDL_Init (SDL_INIT_VIDEO) != 0)
+	{
+		fprintf (stderr, "There was an error initializing the SDL library: %s\n", SDL_GetError());
+	}
 
 	a.window [0] = SDL_CreateWindow (WIN_TITLE, WIN_X, WIN_Y, WIN_W, WIN_H, SDL_WINDOW_OPENGL);
-	XSDL_ASSERT_CreateWindow (a.window [0]);
+	if (a.window [0] == NULL)
+	{
+		fprintf (stderr, "Could not create window: %s\n", SDL_GetError());
+	}
+
 
 	SDL_Event event;
 	while (1)
 	{
 		if (flags & APP_QUIT) {break;}
 		//printf ("SDL_WaitEvent: %i\n", SDL_WaitEvent (&event));
-		XSDL_WaitEvent (&event);
+		if (SDL_WaitEvent (&event) != 1)
+		{
+			fprintf (stderr, "There was an error while waiting for events: %s\n", SDL_GetError());
+		}
 		SDL_Delay(100);
 		switch (event.type)
 		{
@@ -90,7 +88,10 @@ int main (int argc, char * argv[])
 		}
 	}
 
-	XSDL_DestroyWindows (a.window, a.n);
+	for (uint32_t i = 0; i < a.n; i ++)
+	{
+		SDL_DestroyWindow (a.window [i]);
+	}
 	SDL_Quit();
 
 	return 0;

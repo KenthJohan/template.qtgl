@@ -3,9 +3,8 @@ CONFIG += console
 CONFIG -= app_bundle
 CONFIG -= qt
 
-SOURCES += \
-        main.c
+SOURCES += main.c
 
-INCLUDEPATH += C:\msys64\mingw64\include
+#DEFINES += main=SDL_main
 
-win32: LIBS += -LC:\msys64\mingw64\lib -lmingw32 -lSDL2main -lSDL2
+LIBS += -lmingw32 -lSDL2main -lSDL2 -mwindows
