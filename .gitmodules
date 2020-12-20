@@ -10,3 +10,6 @@
 [submodule "demo1/csc"]
 	path = demo1/csc
 	url = https://github.com/KenthJohan/csc
+[submodule "demo2/csc"]
+	path = demo2/csc
+	url = https://github.com/KenthJohan/csc
