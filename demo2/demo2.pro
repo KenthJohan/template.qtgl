@@ -3,7 +3,7 @@ CONFIG += console
 CONFIG -= app_bundle
 CONFIG -= qt
 
-DEFINES += CSC_SRCDIR=\\\"../texture/\\\"
+DEFINES += CSC_SRCDIR=\\\"../demo2/\\\"
 
 QMAKE_CFLAGS += -Wno-unused-function
 
