@@ -1,0 +1,14 @@
+#version 330 core
+
+out vec4 fragcol;
+in vec4 col;
+
+
+void main()
+{
+	fragcol = col;
+	fragcol.r = 1.0;
+	fragcol.g = 1.0;
+	fragcol.b = 1.0;
+	fragcol.a = 1.0;
+}

@@ -1,0 +1,17 @@
+#version 330 core
+out vec4 fragcol;
+
+in vec2 texuv;
+
+// texture samplers
+//uniform sampler2D texture1;
+uniform sampler2DArray texture1;
+
+
+void main()
+{
+	fragcol = texture(texture1, vec3(texuv, 0));
+	fragcol.r += 0.5;
+	fragcol.g += 0.5;
+	fragcol.b += 0.5;
+}

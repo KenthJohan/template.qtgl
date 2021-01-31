@@ -8,7 +8,7 @@
 #include "csc/csc_math.h"
 #include "csc/csc_sdlglew.h"
 #include "csc/csc_dod.h"
-//#include "csc/csc_glimage.h"
+#include "csc/csc_glimage.h"
 #include "csc/csc_glpointcloud.h"
 
 #include <SDL2/SDL.h>
@@ -125,30 +125,43 @@ int main (int argc, char * argv[])
 	SDL_GLContext context;
 	csc_sdlglew_create_window (&window, &context, WIN_TITLE, WIN_X, WIN_Y, WIN_W, WIN_H, SDL_WINDOW_OPENGL);
 
+	glEnable (GL_VERTEX_PROGRAM_POINT_SIZE);
+	glEnable (GL_BLEND);
+	glEnable (GL_DEPTH_TEST);
+	//glBlendFunc (GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
 
-	char const * shaderfiles[] = {CSC_SRCDIR"image.glvs", CSC_SRCDIR"image.glfs", NULL};
+
+
 
 	struct csc_glimage img;
 	img.cap = 4;
-	img.glprogram = csc_gl_program_from_files (shaderfiles);
+	img.glprogram = csc_gl_program_from_files1 (CSC_SRCDIR"image.glvs;"CSC_SRCDIR"image.glfs");
 	glLinkProgram (img.glprogram);
 	csc_glimage_init (&img);
 
 	float xyzw[] =
 	{
 	0.0f, 0.0f, 0.0f, 0.0f,
-	0.0f, 0.0f, 1.0f, 0.0f,
-	0.0f, 0.0f, 2.0f, 0.0f,
-	0.0f, 0.0f, 3.0f, 0.0f,
+	0.0f, 1.0f, 0.0f, 0.0f,
+	1.0f, 0.0f, 0.0f, 0.0f,
+	1.0f, 1.0f, 0.0f, 0.0f,
 	};
 	float wh[] =
 	{
 	0.5f, 0.5f,
-	0.5f, 0.5f,
-	0.5f, 0.5f,
-	0.5f, 0.5f,
+	0.5f, 0.6f,
+	0.5f, 0.7f,
+	0.5f, 0.8f,
 	};
 	csc_glimage_update_xywh (&img, xyzw, wh, 4);
+
+
+
+	struct csc_glpointcloud pointcloud;
+	pointcloud.cap = 1000;
+	pointcloud.glprogram = csc_gl_program_from_files1 (CSC_SRCDIR"pointcloud.glvs;"CSC_SRCDIR"pointcloud.glfs");
+	glLinkProgram (pointcloud.glprogram);
+	csc_glpointcloud_init (&pointcloud);
 
 
 
@@ -217,6 +230,7 @@ int main (int argc, char * argv[])
 		glClear (GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
 		csc_glimage_draw (&img, gcam.mvp);
+		csc_glpointcloud_draw (&pointcloud, gcam.mvp);
 
 		/*
 		glUniform1i (uniform_texture1, 0);
