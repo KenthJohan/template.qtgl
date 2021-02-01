@@ -10,10 +10,15 @@
 #include "csc/csc_dod.h"
 #include "csc/csc_glimage.h"
 #include "csc/csc_glpointcloud.h"
+#include "csc/csc_gltex.h"
+
+#include "api.h"
 
 #include <SDL2/SDL.h>
 #include <GL/glew.h>
 #include <stdio.h>
+
+
 
 
 #define WIN_X SDL_WINDOWPOS_UNDEFINED
@@ -32,81 +37,6 @@
 
 
 
-
-
-
-void fill_texture (uint8_t * data, int w, int h, uint32_t c, uint32_t n)
-{
-	memset (data, 0, w * h * c);
-	/*
-	for (int x = 0; x < width; ++x)
-	for (int y = 0; y < height; ++y)
-	{
-		uint8_t * p = data + (x*4) + (y*width*4);
-		p[0] = 0;
-		p[1] = 0;
-		p[2] = 0;
-		p[3] = 0;
-		p[index] = 255;
-	}
-	*/
-	//ASSERT (index < channels);
-	int x = w/2;
-	int y = h/2;
-	int dx = 0;
-	int dy = 0;
-	for (uint32_t i = 0; i < n; ++i)
-	{
-		x += CLAMP (dx, -2, 2);
-		y += CLAMP (dy, -2, 2);
-		dx += (rand() % 3) - 1;
-		dy += (rand() % 3) - 1;
-		if (x < 0 || x >= w){dx = -dx/2;}
-		if (y < 0 || y >= h){dy = -dy/2;}
-		x = CLAMP (x, 0, w-1);
-		y = CLAMP (y, 0, h-1);
-		int i = (x*c) + (y*w*c);
-		ASSERT (i >= 0);
-		data[i + 0] = 255;
-	}
-	for (uint32_t i = 0; i < n; ++i)
-	{
-		x += CLAMP (dx, -2, 2);
-		y += CLAMP (dy, -2, 2);
-		dx += (rand() % 3) - 1;
-		dy += (rand() % 3) - 1;
-		if (x < 0 || x >= w){dx = -dx/2;}
-		if (y < 0 || y >= h){dy = -dy/2;}
-		x = CLAMP (x, 0, w-1);
-		y = CLAMP (y, 0, h-1);
-		int i = (x*c) + (y*w*c);
-		ASSERT (i >= 0);
-		data[i + 1] = 255;
-	}
-	for (uint32_t i = 0; i < n; ++i)
-	{
-		x += CLAMP (dx, -2, 2);
-		y += CLAMP (dy, -2, 2);
-		dx += (rand() % 3) - 1;
-		dy += (rand() % 3) - 1;
-		if (x < 0 || x >= w){dx = -dx/2;}
-		if (y < 0 || y >= h){dy = -dy/2;}
-		x = CLAMP (x, 0, w-1);
-		y = CLAMP (y, 0, h-1);
-		int i = (x*c) + (y*w*c);
-		ASSERT (i >= 0);
-		data[i + 2] = 255;
-	}
-}
-
-
-void fill_texture2 (uint8_t * data, int w, int h, int c, uint8_t value)
-{
-	for (int i = 0; i < w * h * c; ++i)
-	{
-		data[i] = value;
-	}
-}
 
 
 
@@ -133,27 +63,21 @@ int main (int argc, char * argv[])
 
 
 
-	struct csc_glimage img;
+	struct csc_glimgcontext img;
 	img.cap = 4;
 	img.glprogram = csc_gl_program_from_files1 (CSC_SRCDIR"image.glvs;"CSC_SRCDIR"image.glfs");
 	glLinkProgram (img.glprogram);
 	csc_glimage_init (&img);
 
-	float xyzw[] =
+
+	struct csc_glimg imgs[] =
 	{
-	0.0f, 0.0f, 0.0f, 0.0f,
-	0.0f, 1.0f, 0.0f, 0.0f,
-	1.0f, 0.0f, 0.0f, 0.0f,
-	1.0f, 1.0f, 0.0f, 0.0f,
-	};
-	float wh[] =
-	{
-	0.5f, 0.5f,
-	0.5f, 0.6f,
-	0.5f, 0.7f,
-	0.5f, 0.8f,
-	};
-	csc_glimage_update_xywh (&img, xyzw, wh, 4);
+	{.pos = {0.0f, 0.0f, 0.0f, 0.0f}, 0.5f, 0.5f, 0},
+	{.pos = {0.0f, 1.0f, 0.0f, 0.0f}, 0.5f, 0.5f, 1},
+	{.pos = {1.0f, 0.0f, 0.0f, 0.0f}, 0.5f, 0.5f, 2},
+	{.pos = {1.0f, 1.0f, 0.0f, 0.0f}, 0.5f, 0.5f, 3}};
+
+	csc_glimage_update (&img, imgs, 4);
 
 
 
@@ -164,44 +88,17 @@ int main (int argc, char * argv[])
 	csc_glpointcloud_init (&pointcloud);
 
 
-
-	//https://sites.google.com/site/john87connor/texture-object/tutorial-09-6-array-texture
-	//https://community.khronos.org/t/when-to-use-glactivetexture/64913/2
-	GLuint textures[1];
-	{
-		srand (0);
-		int width = 256;
-		int height = 256;
-		int layers = 4;
-		int channels = 4;
-		unsigned size = width * height * channels * sizeof(uint8_t);
-		uint8_t * data = calloc (size, 1);
-		glGenTextures (1, textures);
-		glActiveTexture (GL_TEXTURE0 + 0);
-		glBindTexture (GL_TEXTURE_2D_ARRAY, textures[0]);//Depends on glActiveTexture()
-		glTexParameteri (GL_TEXTURE_2D_ARRAY, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);//Depends on glBindTexture()
-		glTexParameteri (GL_TEXTURE_2D_ARRAY, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);//Depends on glBindTexture()
-		glTexParameteri (GL_TEXTURE_2D_ARRAY, GL_TEXTURE_MIN_FILTER, GL_NEAREST);//Depends on glBindTexture()
-		glTexParameteri (GL_TEXTURE_2D_ARRAY, GL_TEXTURE_MAG_FILTER, GL_NEAREST);//Depends on glBindTexture()
-		glTexStorage3D (GL_TEXTURE_2D_ARRAY, 1, GL_RGBA8, width, height, layers);//Depends on glBindTexture()
-		//fill_texture (data, width, height, channels, 0);
-		//fill_texture2 (data, width, height, channels, 255);
-		fill_texture (data, width, height, channels, 200);
-		glTexSubImage3D (GL_TEXTURE_2D_ARRAY, 0, 0, 0, 0, width, height, 1, GL_RGBA, GL_UNSIGNED_BYTE, data);//Depends on glBindTexture()
-		//fill_texture2 (data, width, height, channels, 200);
-		fill_texture (data, width, height, channels, 200);
-		glTexSubImage3D (GL_TEXTURE_2D_ARRAY, 0, 0, 0, 1, width, height, 1, GL_RGBA, GL_UNSIGNED_BYTE, data);//Depends on glBindTexture()
-		//fill_texture2 (data, width, height, channels, 100);
-		fill_texture (data, width, height, channels, 200);
-		glTexSubImage3D (GL_TEXTURE_2D_ARRAY, 0, 0, 0, 2, width, height, 1, GL_RGBA, GL_UNSIGNED_BYTE, data);//Depends on glBindTexture()
-		//fill_texture2 (data, width, height, channels, 50);
-		fill_texture (data, width, height, channels, 200);
-		glTexSubImage3D (GL_TEXTURE_2D_ARRAY, 0, 0, 0, 3, width, height, 1, GL_RGBA, GL_UNSIGNED_BYTE, data);//Depends on glBindTexture()
-	}
-
-
-
-
+	struct csc_gltexcontext texctx = {0};
+	texctx.cap = 2;
+	texctx.tex[0].width = 256;
+	texctx.tex[0].height = 256;
+	texctx.tex[0].layers = 4;
+	texctx.tex[0].unit = 0;
+	texctx.tex[1].width = 64;
+	texctx.tex[1].height = 64;
+	texctx.tex[1].layers = 4;
+	texctx.tex[1].unit = 0;
+	csc_gltexcontext_init (&texctx);
 
 
 	struct csc_gcam gcam;
@@ -229,8 +126,21 @@ int main (int argc, char * argv[])
 		glClearColor (0.2f, 0.3f, 0.3f, 1.0f);
 		glClear (GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
+
+		if (keyboard[SDL_SCANCODE_0])
+		{
+			glBindTexture (GL_TEXTURE_2D_ARRAY, texctx.tbo[0]);
+		}
+
+		if (keyboard[SDL_SCANCODE_1])
+		{
+			glBindTexture (GL_TEXTURE_2D_ARRAY, texctx.tbo[1]);
+		}
+
 		csc_glimage_draw (&img, gcam.mvp);
 		csc_glpointcloud_draw (&pointcloud, gcam.mvp);
+
+
 
 		/*
 		glUniform1i (uniform_texture1, 0);

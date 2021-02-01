@@ -1,7 +1,7 @@
 #version 330 core
-out vec4 fragcol;
+out vec4 frag;
 
-in vec2 texuv;
+in vec3 texcoord;
 
 // texture samplers
 //uniform sampler2D texture1;
@@ -10,8 +10,10 @@ uniform sampler2DArray texture1;
 
 void main()
 {
-	fragcol = texture(texture1, vec3(texuv, 0));
-	fragcol.r += 0.5;
-	fragcol.g += 0.5;
-	fragcol.b += 0.5;
+	frag = texture(texture1, vec3(texcoord.xy, texcoord.z));
+	/*
+	frag.r += 0.5;
+	frag.g += 0.5;
+	frag.b += 0.5;
+	*/
 }
