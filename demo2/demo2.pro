@@ -23,6 +23,6 @@ SOURCES += flecs/flecs_json.c
 INCLUDEPATH += flecs
 INCLUDEPATH += flecs/flecs-os_api-posix/include
 
-LIBS += -lmingw32 -lSDL2main -lSDL2 -lopengl32 -lglew32
+LIBS += -lmingw32 -lSDL2main -lSDL2 -lopengl32 -lglew32 -lSDL2_net
 
 LIBS += -lws2_32 -lwsock32 -lpthread

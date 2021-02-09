@@ -15,13 +15,12 @@
 //#include "api.h"
 
 #include <flecs.h>
-#include <flecs_dash.h>
-#include <flecs_systems_civetweb.h>
 #include <posix_set_os_api.h>
 
 
 
 #include <SDL2/SDL.h>
+#include <SDL2/SDL_net.h>
 #include <GL/glew.h>
 #include <stdio.h>
 
@@ -46,46 +45,31 @@ static struct csc_gcam global_gcam = {0};
 static struct csc_gltexcontext global_texctx = {0};
 static struct csc_glimgcontext global_imgctx = {0};
 static struct csc_glpointcloud global_pointcloud = {0};
+static ecs_world_t * world;
+
+typedef struct v4f32 component_position;
+typedef struct v2f32 component_wh;
+typedef uint32_t component_texlayer;
 
 
 
 
-ECS_STRUCT(position_v3f32,
+#define RECTANLGE_RENDER_MAX 100
+static void rectangle_render (ecs_iter_t *it)
 {
-float v[3];
-});
-
-ECS_STRUCT(rectangle_v2f32,
-{
-float v[2];
-});
-
-ECS_STRUCT(velocity_v3f32,
-{
-float v[3];
-});
-
-ECS_STRUCT(texture_layer,
-{
-uint32_t layer;
-});
-
-
-
-#define RENDER_RECTANLGE_MAX 100
-static void render_rectangle (ecs_iter_t *it)
-{
-	static float vertex[CSC_GLIMAGE_VERTS_COUNT * CSC_GLIMAGE_POS_DIM * RENDER_RECTANLGE_MAX] = {0.0f};
-	ECS_COLUMN(it, position_v3f32, p, 1);
-	ECS_COLUMN(it, rectangle_v2f32, r, 2);
-	ECS_COLUMN(it, texture_layer, l, 3);
+	static float vertex[CSC_GLIMAGE_VERTS_COUNT * CSC_GLIMAGE_POS_DIM * RECTANLGE_RENDER_MAX] = {0.0f};
+	ECS_COLUMN(it, component_position, comp_position, 1);
+	ECS_COLUMN(it, component_wh, comp_wh, 2);
+	ECS_COLUMN(it, component_texlayer, comp_texlayer, 3);
 	csc_glimage_begin_draw (&global_imgctx, global_gcam.mvp);
-	int32_t count = MIN(RENDER_RECTANLGE_MAX, it->count);
+	int32_t count = MIN(RECTANLGE_RENDER_MAX, it->count);
 	float * v = vertex;
 	for (int32_t i = 0; i < count; i ++)
 	{
+		float * p = comp_position[i].v;
+		float * wh = comp_wh[i].v;
 		//printf ("%3.3f %3.3f %3.3f, %3.3f, %3.3f, %3i\n", p[i].v[0], p[i].v[1], p[i].v[2], r[i].v[0], r[i].v[1], l[i].layer);
-		csc_gl_make_rectangle_pos (v, p[i].v[0], p[i].v[1], p[i].v[2], l[i].layer, r[i].v[0], r[i].v[1], CSC_GLIMAGE_POS_DIM);
+		csc_gl_make_rectangle_pos (v, p[0], p[1], p[2], comp_texlayer[i], wh[0], wh[1], CSC_GLIMAGE_POS_DIM);
 		v += CSC_GLIMAGE_VERTS_COUNT * CSC_GLIMAGE_POS_DIM;
 	}
 	glBindBuffer (GL_ARRAY_BUFFER, global_imgctx.vbop);
@@ -95,12 +79,38 @@ static void render_rectangle (ecs_iter_t *it)
 
 
 
+static void pointcloud_render (ecs_iter_t *it)
+{
+	ECS_COLUMN(it, component_position, comp_position, 1);
+	csc_glpointcloud_begin_draw (&global_pointcloud, global_gcam.mvp);
+	glBindBuffer (GL_ARRAY_BUFFER, global_pointcloud.vbop);
+	glBufferSubData (GL_ARRAY_BUFFER, 0, it->count * CSC_GLPOINTCLOUD_POS_DIM * sizeof (float), comp_position);
+	glDrawArrays (GL_POINTS, 0, it->count);
+}
+
+
+static void pointcloud_onadd (ecs_iter_t *it)
+{
+	ECS_COLUMN(it, component_position, comp_position, 1);
+	for (int32_t i = 0; i < it->count; ++i)
+	{
+		float * p = comp_position[i].v;
+		p[0] = (((float)rand() / (float)RAND_MAX)-0.5f) * 1.0f;
+		p[1] = (((float)rand() / (float)RAND_MAX)-0.5f) * 1.0f;
+		p[2] = (((float)rand() / (float)RAND_MAX)-0.5f) * 1.0f;
+		p[3] = 10.0f;
+	}
+}
+
+
+
+
 
 
 static void bounce (ecs_iter_t *it)
 {
 	//struct position_v3f32 *p = ecs_column(it, position_v3f32, 1);
-	ECS_COLUMN(it, position_v3f32, p, 1);
+	ECS_COLUMN(it, component_position, p, 1);
 	for (int i = 0; i < it->count; i ++)
 	{
 		p[i].v[0] = (((float)rand() / (float)RAND_MAX)-0.5f) * 1.0f;
@@ -112,7 +122,113 @@ static void bounce (ecs_iter_t *it)
 
 
 
+struct mypackage
+{
+	uint32_t type;
+	uint32_t offset;
+	uint8_t data[0];
+};
 
+#define MYPACKAGE_POINTCLOUD 1
+#define MYPACKAGE_IMGPOS 2
+#define MYPACKAGE_IMGTEX 3
+
+
+
+#define MYPACKAGE_MAX 100000
+static int mypackage_receiver (void *ptr)
+{
+	IPaddress ip;
+	TCPsocket server;
+	TCPsocket client;
+
+	if (SDLNet_ResolveHost (&ip, NULL, 9999) == -1)
+	{
+		printf("SDLNet_ResolveHost: %s\n", SDLNet_GetError());
+		exit(1);
+	}
+
+	server = SDLNet_TCP_Open (&ip);
+
+	if(!server)
+	{
+		printf("SDLNet_TCP_Open: %s\n", SDLNet_GetError());
+		exit(2);
+	}
+
+
+stage_connection:
+	{
+		client = SDLNet_TCP_Accept (server);
+		if(!client)
+		{
+			printf ("SDLNet_TCP_Accept: %s\n", SDLNet_GetError());
+			SDL_Delay(2000);
+			goto stage_connection;
+		}
+		/* get the clients IP and port number */
+		IPaddress *remoteip;
+		remoteip = SDLNet_TCP_GetPeerAddress (client);
+		if (!remoteip)
+		{
+			printf ("SDLNet_TCP_GetPeerAddress: %s\n", SDLNet_GetError());
+			SDL_Delay(1000);
+			goto stage_connection;
+		}
+		Uint32 ipaddr;
+		ipaddr = SDL_SwapBE32 (remoteip->host);
+		printf ("Accepted a connection from %d.%d.%d.%d port %hu\n", ipaddr >> 24,(ipaddr >> 16) & 0xff, (ipaddr >> 8) & 0xff, ipaddr & 0xff, remoteip->port);
+	}
+
+
+	struct mypackage * pkg = calloc (sizeof (struct mypackage) + MYPACKAGE_MAX, 1);
+
+	while(1)
+	{
+		int len = SDLNet_TCP_Recv (client, pkg, sizeof (struct mypackage) + MYPACKAGE_MAX);
+		if (len <= 0)
+		{
+			printf ("SDLNet_TCP_Recv: %s\n", SDLNet_GetError());
+			SDL_Delay (1000);
+			goto stage_connection;
+		}
+		else if (len <= sizeof (struct mypackage))
+		{
+			printf ("Received: %.*s\n", len, pkg);
+			continue;
+		}
+
+		printf ("Received: type=%i, offset=%i\n", pkg->type, pkg->offset);
+
+
+		switch (pkg->type)
+		{
+		case MYPACKAGE_IMGPOS:
+			break;
+		case MYPACKAGE_IMGTEX:
+			break;
+		case MYPACKAGE_POINTCLOUD:
+			break;
+		default:
+			continue;
+		}
+
+		ecs_query_t * query = ecs_query_new (world, "component_position, tag_points");
+		ecs_iter_t it = ecs_query_iter (query);
+		while (ecs_query_next(&it))
+		{
+			ECS_COLUMN (&it, component_position, comp_position, 1);
+			for (int32_t i = 0; i < it.count; ++i)
+			{
+				float * p = comp_position[i].v;
+				p[0] += 0.1f;
+			}
+		}
+
+	}
+
+	return 0;
+}
 
 
 
@@ -120,56 +236,20 @@ static void bounce (ecs_iter_t *it)
 
 int main (int argc, char * argv[])
 {
-	posix_set_os_api();
 	csc_crossos_enable_ansi_color ();
 	ASSERT (argc);
 	ASSERT (argv);
 
-
-
-
-	ecs_world_t * world = ecs_init();
-
-	ECS_COMPONENT(world, position_v3f32);
-	ECS_COMPONENT(world, rectangle_v2f32);
-	ECS_COMPONENT(world, texture_layer);
-
-	ECS_TYPE(world, type_flatimage, position_v3f32, rectangle_v2f32, texture_layer);
-
-	//ECS_SYSTEM(world, bounce, EcsOnUpdate, type_flatimage);
-	ECS_SYSTEM(world, render_rectangle, EcsOnUpdate, position_v3f32, rectangle_v2f32, texture_layer);
-
-
-//	ecs_entity_t * e = ecs_bulk_new (world, type_flatimage, 10);
-	ECS_ENTITY(world, MyEntity0, position_v3f32, rectangle_v2f32, texture_layer);
-	ecs_set(world, MyEntity0, position_v3f32, {0.0f, 0.0f, 0.0f});
-	ecs_set(world, MyEntity0, rectangle_v2f32, {1.0f, 1.0f});
-	ecs_set(world, MyEntity0, texture_layer, {0});
-
-	ECS_ENTITY(world, MyEntity1, position_v3f32, rectangle_v2f32, texture_layer);
-	ecs_set(world, MyEntity1, position_v3f32, {0.0f, 1.0f, 0.0f});
-	ecs_set(world, MyEntity1, rectangle_v2f32, {1.0f, 1.0f});
-	ecs_set(world, MyEntity1, texture_layer, {1});
-
-	ECS_ENTITY(world, MyEntity2, position_v3f32, rectangle_v2f32, texture_layer);
-	ecs_set(world, MyEntity2, position_v3f32, {1.0f, 0.0f, 0.0f});
-	ecs_set(world, MyEntity2, rectangle_v2f32, {1.0f, 0.5f});
-	ecs_set(world, MyEntity2, texture_layer, {2});
-
-	ECS_ENTITY(world, MyEntity3, position_v3f32, rectangle_v2f32, texture_layer);
-	ecs_set(world, MyEntity3, position_v3f32, {1.0f, 1.0f, 0.0f});
-	ecs_set(world, MyEntity3, rectangle_v2f32, {1.0f, 0.5f});
-	ecs_set(world, MyEntity3, texture_layer, {3});
-
-	ecs_set_target_fps (world, 60);
-
-
-
 	uint32_t main_flags = CSC_SDLGLEW_RUNNING;
-
 	SDL_Window * window;
 	SDL_GLContext context;
 	csc_sdlglew_create_window (&window, &context, WIN_TITLE, WIN_X, WIN_Y, WIN_W, WIN_H, SDL_WINDOW_OPENGL);
+	if (SDLNet_Init() == -1)
+	{
+		printf("SDLNet_Init: %s\n", SDLNet_GetError());
+		exit(2);
+	}
+	SDL_Thread * thread = SDL_CreateThread (mypackage_receiver, "pointcloud_receiver", (void *)NULL);
 
 	glEnable (GL_VERTEX_PROGRAM_POINT_SIZE);
 	glEnable (GL_BLEND);
@@ -177,24 +257,10 @@ int main (int argc, char * argv[])
 	//glBlendFunc (GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
 
 
-
-
-	global_imgctx.cap = 4;
+	global_imgctx.cap = RECTANLGE_RENDER_MAX;
 	global_imgctx.glprogram = csc_gl_program_from_files1 (CSC_SRCDIR"image.glvs;"CSC_SRCDIR"image.glfs");
 	glLinkProgram (global_imgctx.glprogram);
 	csc_glimage_init (&global_imgctx);
-
-
-	struct csc_glimg imgs[] =
-	{
-	{.pos = {0.0f, 0.0f, 0.0f, 0.0f}, 0.5f, 0.5f, 0},
-	{.pos = {0.0f, 1.0f, 0.0f, 0.0f}, 0.5f, 0.5f, 1},
-	{.pos = {1.0f, 0.0f, 0.0f, 0.0f}, 0.5f, 0.5f, 2},
-	{.pos = {1.0f, 1.0f, 0.0f, 0.0f}, 0.5f, 0.5f, 3}};
-
-	csc_glimage_update (&global_imgctx, imgs, 4);
-
-
 
 
 
@@ -219,6 +285,48 @@ int main (int argc, char * argv[])
 
 	csc_gcam_init (&global_gcam);
 	v4f32_set_xyzw (global_gcam.p, 0.0f, 0.0f, -4.0f, 1.0f);
+
+
+
+
+
+	world = ecs_init();
+	ECS_COMPONENT(world, component_position);
+	ECS_COMPONENT(world, component_wh);
+	ECS_COMPONENT(world, component_texlayer);
+	ECS_TAG(world, tag_glrectangles);
+	ECS_TAG(world, tag_points);
+	//ECS_SYSTEM(world, bounce, EcsOnUpdate, type_flatimage);
+	ECS_TYPE(world, components_img, component_position, component_wh, component_texlayer, tag_glrectangles);
+	ECS_TYPE(world, components_pointcloud, component_position, tag_points);
+	ECS_SYSTEM(world, rectangle_render, EcsOnUpdate, component_position, component_wh, component_texlayer, tag_glrectangles);
+	ECS_SYSTEM(world, pointcloud_render, EcsOnUpdate, component_position, tag_points);
+	ECS_SYSTEM(world, pointcloud_onadd, EcsMonitor, component_position, tag_points);
+	ecs_entity_t eimg[4];
+	memcpy(eimg, ecs_bulk_new (world, components_img, 4), sizeof(eimg));
+	ecs_set(world, eimg[0], component_position, {0.0f, 0.0f, 0.0f});
+	ecs_set(world, eimg[0], component_wh, {1.0f, 1.0f});
+	ecs_set(world, eimg[0], component_texlayer, {0});
+	ecs_set(world, eimg[1], component_position, {0.0f, 1.0f, 0.0f});
+	ecs_set(world, eimg[1], component_wh, {1.0f, 1.0f});
+	ecs_set(world, eimg[1], component_texlayer, {1});
+	ecs_set(world, eimg[2], component_position, {1.0f, 0.0f, 0.0f});
+	ecs_set(world, eimg[2], component_wh, {1.0f, 1.0f});
+	ecs_set(world, eimg[2], component_texlayer, {2});
+	ecs_set(world, eimg[3], component_position, {1.0f, 1.0f, 0.0f});
+	ecs_set(world, eimg[3], component_wh, {1.0f, 2.0f});
+	ecs_set(world, eimg[3], component_texlayer, {3});
+	ecs_entity_t epc[100];
+	memcpy(epc, ecs_bulk_new (world, components_pointcloud, 50), sizeof(epc));
+	ecs_set(world, epc[0], component_position, {0.0f, 0.0f, 0.0f});
+	//ecs_query_t const *q_parent = ecs_query_new(world, "components_pointcloud");
+	//ecs_iter_t it = ecs_query_iter(q_sub);
+	ecs_set_target_fps (world, 60);
+
+
+
+
+
 
 	const Uint8 * keyboard = SDL_GetKeyboardState (NULL);
 	while (main_flags & CSC_SDLGLEW_RUNNING)
@@ -252,17 +360,15 @@ int main (int argc, char * argv[])
 			glBindTexture (GL_TEXTURE_2D_ARRAY, global_texctx.tbo[1]);
 		}
 
-		csc_glimage_draw (&global_imgctx, global_gcam.mvp);
-		csc_glpointcloud_draw (&global_pointcloud, global_gcam.mvp);
-
-
-
-		/*
-		glUniform1i (uniform_texture1, 0);
-		glUniformMatrix4fv (uniform_mvp, 1, GL_FALSE, (const GLfloat *) gcam.mvp);
-		glDrawArrays (GL_TRIANGLES, 0, img.cap * CSC_GLIMAGE_VERTS_COUNT);
-		*/
-
+		if (keyboard[SDL_SCANCODE_G])
+		{
+			component_position * p;
+			//p = ecs_get_mut(world, eimg[0], component_position, NULL);
+			//p->v[0] -= 0.1f;
+			p = ecs_get_mut(world, epc[0], component_position, NULL);
+			p->v[0] -= 0.01f;
+			p->v[3] = 100.0f;
+		}
 
 		ecs_progress(world, 0);
 		SDL_Delay (10);
