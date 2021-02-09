@@ -12,11 +12,18 @@
 #include "csc/csc_glpointcloud.h"
 #include "csc/csc_gltex.h"
 
-#include "api.h"
+//#include "api.h"
+
 
 #include <SDL2/SDL.h>
 #include <GL/glew.h>
 #include <stdio.h>
+
+#include "mygl.h"
+
+
+
+
 
 
 
@@ -33,10 +40,6 @@
 #define COMP_POS 0
 #define COMP_VEL 1
 #define COMP_MASS 2
-
-
-
-
 
 
 
@@ -147,7 +150,6 @@ int main (int argc, char * argv[])
 		glUniformMatrix4fv (uniform_mvp, 1, GL_FALSE, (const GLfloat *) gcam.mvp);
 		glDrawArrays (GL_TRIANGLES, 0, img.cap * CSC_GLIMAGE_VERTS_COUNT);
 		*/
-
 
 
 		SDL_Delay (10);

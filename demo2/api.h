@@ -21,7 +21,8 @@
 enum mytype
 {
 	MYTYPE_TEXSTORAGE,
-	MYTYPE_TEXDATA,
+	MYTYPE_GLIMG,
+	MYTYPE_V4F32
 };
 
 
@@ -44,8 +45,9 @@ struct myapi_package
 			uint32_t layer;
 			uint32_t size;
 		} texdata;
+		struct csc_glimg glimg;
 	};
-	void * data;
+	uint8_t data[0];
 };
 
 void myapi_send(struct myapi_package * pkg)
@@ -54,7 +56,12 @@ void myapi_send(struct myapi_package * pkg)
 }
 
 
-void myapi_recv (struct myapi_package * pkg, struct csc_gltexcontext * texctx)
+void myapi_recv
+(
+		struct myapi_package * pkg,
+		struct csc_gltexcontext * texctx,
+		struct csc_glimgcontext * imgctx
+)
 {
 	switch (pkg->type)
 	{
@@ -64,7 +71,8 @@ void myapi_recv (struct myapi_package * pkg, struct csc_gltexcontext * texctx)
 		texctx->tex[pkg->texstorage.tbo].layers = pkg->texstorage.layers;
 		texctx->tex[pkg->texstorage.tbo].unit = pkg->texstorage.unit;
 		break;
-	case MYTYPE_TEXDATA:
+	case MYTYPE_GLIMG:
+		csc_glimage_update (imgctx, &pkg->glimg, 1);
 		break;
 	}
 }
@@ -85,7 +93,6 @@ void myapi_test()
 	p2.texdata.tbo = 0;
 	p2.texdata.layer = 0;
 	p2.texdata.size = 256*256*4;
-	p2.data = NULL;
 	myapi_send (&p2);
 }
 
