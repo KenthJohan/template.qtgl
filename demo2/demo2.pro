@@ -7,6 +7,9 @@ DEFINES += CSC_SRCDIR=\\\"../demo2/\\\"
 #DEFINES += DEBUG
 
 QMAKE_CFLAGS += -Wno-unused-function
+QMAKE_CFLAGS += -Wno-missing-braces
+QMAKE_CFLAGS += -Wno-unused-parameter
+QMAKE_CFLAGS += -Wno-missing-field-initializers
 
 SOURCES += main3.c
 SOURCES += flecs/flecs.c

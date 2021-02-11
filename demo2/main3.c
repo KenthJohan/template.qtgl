@@ -7,12 +7,12 @@
 #include "csc/csc_gl.h"
 #include "csc/csc_math.h"
 #include "csc/csc_sdlglew.h"
-#include "csc/csc_dod.h"
-#include "csc/csc_glimage.h"
-#include "csc/csc_glpointcloud.h"
-#include "csc/csc_gltex.h"
+#include "csc/experiment/csc_glimage.h"
+#include "csc/experiment/csc_glpointcloud.h"
+#include "csc/experiment/csc_gltex.h"
 
-//#include "api.h"
+#include "csc/experiment/netgl.h"
+#include "csc/experiment/netgl_opengl.h"
 
 #include <flecs.h>
 #include <posix_set_os_api.h>
@@ -33,14 +33,6 @@
 #define WIN_TITLE "Texture Demo"
 
 
-
-
-#define COMP_POS 0
-#define COMP_VEL 1
-#define COMP_MASS 2
-
-
-
 static struct csc_gcam global_gcam = {0};
 static struct csc_gltexcontext global_texctx = {0};
 static struct csc_glimgcontext global_imgctx = {0};
@@ -50,6 +42,20 @@ static ecs_world_t * world;
 typedef struct v4f32 component_position;
 typedef struct v2f32 component_wh;
 typedef uint32_t component_texlayer;
+
+
+
+
+ECS_COMPONENT_DECLARE (component_position);
+ECS_COMPONENT_DECLARE (component_wh);
+ECS_COMPONENT_DECLARE (component_texlayer);
+ECS_TAG_DECLARE (tag_imgs);
+ECS_TAG_DECLARE (tag_points);
+
+
+
+
+
 
 
 
@@ -107,34 +113,6 @@ static void pointcloud_onadd (ecs_iter_t *it)
 
 
 
-static void bounce (ecs_iter_t *it)
-{
-	//struct position_v3f32 *p = ecs_column(it, position_v3f32, 1);
-	ECS_COLUMN(it, component_position, p, 1);
-	for (int i = 0; i < it->count; i ++)
-	{
-		p[i].v[0] = (((float)rand() / (float)RAND_MAX)-0.5f) * 1.0f;
-		p[i].v[1] = (((float)rand() / (float)RAND_MAX)-0.5f) * 1.0f;
-		p[i].v[2] = (((float)rand() / (float)RAND_MAX)-0.5f) * 1.0f;
-	}
-}
-
-
-
-
-struct mypackage
-{
-	uint32_t type;
-	uint32_t offset;
-	uint8_t data[0];
-};
-
-#define MYPACKAGE_POINTCLOUD 1
-#define MYPACKAGE_IMGPOS 2
-#define MYPACKAGE_IMGTEX 3
-
-
-
 #define MYPACKAGE_MAX 100000
 static int mypackage_receiver (void *ptr)
 {
@@ -150,10 +128,10 @@ static int mypackage_receiver (void *ptr)
 
 	server = SDLNet_TCP_Open (&ip);
 
-	if(!server)
+	if (!server)
 	{
-		printf("SDLNet_TCP_Open: %s\n", SDLNet_GetError());
-		exit(2);
+		printf ("SDLNet_TCP_Open: %s\n", SDLNet_GetError());
+		exit (2);
 	}
 
 
@@ -181,37 +159,20 @@ stage_connection:
 	}
 
 
-	struct mypackage * pkg = calloc (sizeof (struct mypackage) + MYPACKAGE_MAX, 1);
+	static uint8_t buffer[10000];
 
 	while(1)
 	{
-		int len = SDLNet_TCP_Recv (client, pkg, sizeof (struct mypackage) + MYPACKAGE_MAX);
+		int len = SDLNet_TCP_Recv (client, buffer, sizeof (buffer));
 		if (len <= 0)
 		{
 			printf ("SDLNet_TCP_Recv: %s\n", SDLNet_GetError());
 			SDL_Delay (1000);
 			goto stage_connection;
 		}
-		else if (len <= sizeof (struct mypackage))
-		{
-			printf ("Received: %.*s\n", len, pkg);
-			continue;
-		}
 
-		printf ("Received: type=%i, offset=%i\n", pkg->type, pkg->offset);
-
-
-		switch (pkg->type)
-		{
-		case MYPACKAGE_IMGPOS:
-			break;
-		case MYPACKAGE_IMGTEX:
-			break;
-		case MYPACKAGE_POINTCLOUD:
-			break;
-		default:
-			continue;
-		}
+		buffer[len] = 0;
+		printf ("Received: %s\n", buffer);
 
 		ecs_query_t * query = ecs_query_new (world, "component_position, tag_points");
 		ecs_iter_t it = ecs_query_iter (query);
@@ -291,17 +252,19 @@ int main (int argc, char * argv[])
 
 
 	world = ecs_init();
-	ECS_COMPONENT(world, component_position);
-	ECS_COMPONENT(world, component_wh);
-	ECS_COMPONENT(world, component_texlayer);
-	ECS_TAG(world, tag_glrectangles);
-	ECS_TAG(world, tag_points);
+	ECS_COMPONENT_DEFINE(world, component_position);
+	ECS_COMPONENT_DEFINE(world, component_wh);
+	ECS_COMPONENT_DEFINE(world, component_texlayer);
+	ECS_TAG_DEFINE(world, tag_imgs);
+	ECS_TAG_DEFINE(world, tag_points);
 	//ECS_SYSTEM(world, bounce, EcsOnUpdate, type_flatimage);
-	ECS_TYPE(world, components_img, component_position, component_wh, component_texlayer, tag_glrectangles);
+	ECS_TYPE(world, components_img, component_position, component_wh, component_texlayer, tag_imgs);
 	ECS_TYPE(world, components_pointcloud, component_position, tag_points);
-	ECS_SYSTEM(world, rectangle_render, EcsOnUpdate, component_position, component_wh, component_texlayer, tag_glrectangles);
+	ECS_SYSTEM(world, rectangle_render, EcsOnUpdate, component_position, component_wh, component_texlayer, tag_imgs);
 	ECS_SYSTEM(world, pointcloud_render, EcsOnUpdate, component_position, tag_points);
 	ECS_SYSTEM(world, pointcloud_onadd, EcsMonitor, component_position, tag_points);
+
+
 	ecs_entity_t eimg[4];
 	memcpy(eimg, ecs_bulk_new (world, components_img, 4), sizeof(eimg));
 	ecs_set(world, eimg[0], component_position, {0.0f, 0.0f, 0.0f});
@@ -322,9 +285,6 @@ int main (int argc, char * argv[])
 	//ecs_query_t const *q_parent = ecs_query_new(world, "components_pointcloud");
 	//ecs_iter_t it = ecs_query_iter(q_sub);
 	ecs_set_target_fps (world, 60);
-
-
-
 
 
 
