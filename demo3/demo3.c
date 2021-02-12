@@ -7,32 +7,25 @@
 #include "csc/csc_gl.h"
 #include "csc/csc_math.h"
 #include "csc/csc_sdlglew.h"
-#include "csc/csc_dod.h"
-#include "csc/csc_glimage.h"
-#include "csc/csc_glpointcloud.h"
-#include "csc/csc_gltex.h"
 
 //#include "api.h"
 
-
+#include <flecs.h>
+#include <posix_set_os_api.h>
 #include <SDL2/SDL.h>
+#include <SDL2/SDL_net.h>
 #include <GL/glew.h>
 #include <stdio.h>
 
-#include "mygl.h"
 
-
-
-
-
-
+#include "components.h"
 
 
 #define WIN_X SDL_WINDOWPOS_UNDEFINED
 #define WIN_Y SDL_WINDOWPOS_UNDEFINED
 #define WIN_W 640
 #define WIN_H 480
-#define WIN_TITLE "Texture Demo"
+#define WIN_TITLE "Demo3"
 
 
 
@@ -42,7 +35,7 @@
 #define COMP_MASS 2
 
 
-
+static ecs_world_t * world;
 
 
 int main (int argc, char * argv[])
@@ -66,47 +59,28 @@ int main (int argc, char * argv[])
 
 
 
-	struct csc_glimgcontext img;
-	img.cap = 4;
-	img.glprogram = csc_gl_program_from_files1 (CSC_SRCDIR"image.glvs;"CSC_SRCDIR"image.glfs");
-	glLinkProgram (img.glprogram);
-	csc_glimage_init (&img);
 
 
-	struct csc_glimg imgs[] =
+	world = ecs_init();
+	components_init (world);
+
+	ECS_TYPE (world, type_points, component_position, tag_glpoints);
+	ecs_entity_t const * e1 = ecs_bulk_new (world, type_points, 100);
+	for (int i = 0; i < 100; ++i)
 	{
-	{.pos = {0.0f, 0.0f, 0.0f, 0.0f}, 0.5f, 0.5f, 0},
-	{.pos = {0.0f, 1.0f, 0.0f, 0.0f}, 0.5f, 0.5f, 1},
-	{.pos = {1.0f, 0.0f, 0.0f, 0.0f}, 0.5f, 0.5f, 2},
-	{.pos = {1.0f, 1.0f, 0.0f, 0.0f}, 0.5f, 0.5f, 3}};
+		ecs_set (world, e1[i], component_position, {(float)i/10.0f, 0.0f, 0.0f, 10.0f});
+	}
 
-	csc_glimage_update (&img, imgs, 4);
+	ECS_TYPE (world, type_imgs, component_position, component_scale, component_quaternion, tag_glimgs);
+	ecs_entity_t const * e2 = ecs_bulk_new (world, type_imgs, 1);
+	for (int i = 0; i < 1; ++i)
+	{
+		ecs_set (world, e2[i], component_position, {0.0f, 0.0f, (float)i/2.0f, 0.0f});
+		ecs_set (world, e2[i], component_scale, {1.0f, (float)i/2.0f + 1.0f, 1.0f, 1.0f});
+		ecs_set (world, e2[i], component_quaternion, {1.0f, 0.0f, 0.0f, 0.0f});
+	}
+	ecs_entity_t e3 = e2[0];
 
-
-
-	struct csc_glpointcloud pointcloud;
-	pointcloud.cap = 1000;
-	pointcloud.glprogram = csc_gl_program_from_files1 (CSC_SRCDIR"pointcloud.glvs;"CSC_SRCDIR"pointcloud.glfs");
-	glLinkProgram (pointcloud.glprogram);
-	csc_glpointcloud_init (&pointcloud);
-
-
-	struct csc_gltexcontext texctx = {0};
-	texctx.cap = 2;
-	texctx.tex[0].width = 256;
-	texctx.tex[0].height = 256;
-	texctx.tex[0].layers = 4;
-	texctx.tex[0].unit = 0;
-	texctx.tex[1].width = 64;
-	texctx.tex[1].height = 64;
-	texctx.tex[1].layers = 4;
-	texctx.tex[1].unit = 0;
-	csc_gltexcontext_init (&texctx);
-
-
-	struct csc_gcam gcam;
-	csc_gcam_init (&gcam);
-	v4f32_set_xyzw (gcam.p, 0.0f, 0.0f, -4.0f, 1.0f);
 
 	const Uint8 * keyboard = SDL_GetKeyboardState (NULL);
 	while (main_flags & CSC_SDLGLEW_RUNNING)
@@ -114,36 +88,45 @@ int main (int argc, char * argv[])
 		SDL_Event event;
 		while (SDL_PollEvent (&event))
 		{
-			csc_sdlglew_event_loop (window, &event, &main_flags, &gcam);
+			csc_sdlglew_event_loop (window, &event, &main_flags, &global_gcam);
 		}
 
 		{
 			//Control graphics camera
-			csc_sdl_motion_wasd (keyboard, gcam.d);
-			csc_sdl_motion_pyr (keyboard, gcam.pyrd);
-			vsf32_mul (3, gcam.d, gcam.d, 0.01f);
-			vsf32_mul (3, gcam.pyrd, gcam.pyrd, 0.01f);
-			csc_gcam_update (&gcam);
+			csc_sdl_motion_wasd (keyboard, global_gcam.d);
+			csc_sdl_motion_pyr (keyboard, global_gcam.pyrd);
+			vsf32_mul (3, global_gcam.d, global_gcam.d, 0.01f);
+			vsf32_mul (3, global_gcam.pyrd, global_gcam.pyrd, 0.01f);
+			csc_gcam_update (&global_gcam);
 		}
 
 		glClearColor (0.2f, 0.3f, 0.3f, 1.0f);
 		glClear (GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
 
-		if (keyboard[SDL_SCANCODE_0])
-		{
-			glBindTexture (GL_TEXTURE_2D_ARRAY, texctx.tbo[0]);
-		}
-
 		if (keyboard[SDL_SCANCODE_1])
 		{
-			glBindTexture (GL_TEXTURE_2D_ARRAY, texctx.tbo[1]);
+			component_quaternion * q = ecs_get_mut (world, e3, component_quaternion, NULL);
+			component_quaternion q0;
+			qf32_xyza ((void*)&q0, 1.0f, 0.0f, 0.0f, 0.01f);
+			qf32_mul ((void*)q, (void*)q, (void*)&q0);
 		}
 
-		csc_glimage_draw (&img, gcam.mvp);
-		csc_glpointcloud_draw (&pointcloud, gcam.mvp);
+		if (keyboard[SDL_SCANCODE_2])
+		{
+			component_quaternion * q = ecs_get_mut (world, e3, component_quaternion, NULL);
+			component_quaternion q0;
+			qf32_xyza ((void*)&q0, 0.0f, 1.0f, 0.0f, 0.01f);
+			qf32_mul ((void*)q, (void*)q, (void*)&q0);
+		}
 
-
+		if (keyboard[SDL_SCANCODE_3])
+		{
+			component_quaternion * q = ecs_get_mut (world, e3, component_quaternion, NULL);
+			component_quaternion q0;
+			qf32_xyza ((void*)&q0, 0.0f, 0.0f, 1.0f, 0.01f);
+			qf32_mul ((void*)q, (void*)q, (void*)&q0);
+		}
 
 		/*
 		glUniform1i (uniform_texture1, 0);
@@ -152,6 +135,7 @@ int main (int argc, char * argv[])
 		*/
 
 
+		ecs_progress(world, 0);
 		SDL_Delay (10);
 		SDL_GL_SwapWindow (window);
 	}
@@ -159,5 +143,6 @@ int main (int argc, char * argv[])
 	SDL_GL_DeleteContext (context);
 	SDL_DestroyWindow (window);
 	SDL_Quit();
+	ecs_fini(world);
 	return 0;
 }
