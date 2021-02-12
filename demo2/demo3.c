@@ -7,22 +7,6 @@
 #include "csc/csc_gl.h"
 #include "csc/csc_math.h"
 #include "csc/csc_sdlglew.h"
-#include "csc/experiment/csc_glimage.h"
-#include "csc/experiment/csc_glpointcloud.h"
-#include "csc/experiment/csc_gltex.h"
-
-#include "csc/experiment/netgl.h"
-#include "netgl_opengl.h"
-
-#include "components.h"
-#include "component_tbo.h"
-#include "component_img.h"
-#include "component_vao.h"
-#include "component_vbo.h"
-
-#include <flecs.h>
-#include <posix_set_os_api.h>
-
 
 
 #include <SDL2/SDL.h>
@@ -40,10 +24,6 @@
 
 
 static struct csc_gcam global_gcam = {0};
-static struct csc_gltexcontext global_texctx = {0};
-//static struct csc_glimgcontext global_imgctx = {0};
-//static struct csc_glpointcloud global_pointcloud = {0};
-static ecs_world_t * world;
 
 
 
@@ -184,6 +164,77 @@ stage_connection:
 */
 
 
+SDLNet_SocketSet test_open (TCPsocket server[], IPaddress ip[], uint32_t n)
+{
+	SDLNet_SocketSet socketset = SDLNet_AllocSocketSet(n);
+	if (socketset == NULL)
+	{
+		fprintf (stderr, "Couldn't create socket set: %s\n", SDLNet_GetError());
+		exit (2);
+	}
+	for (uint32_t i = 0; i < n; ++i)
+	{
+		server[i] = SDLNet_TCP_Open (ip + i);
+		if (!server)
+		{
+			printf ("SDLNet_TCP_Open: %s\n", SDLNet_GetError());
+			exit (2);
+		}
+		int numused = SDLNet_TCP_AddSocket (socketset, server[i]);
+		if (numused==-1)
+		{
+			printf("SDLNet_AddSocket: %s\n", SDLNet_GetError());
+			exit(2);
+		}
+	}
+	return socketset;
+}
+
+
+static int test (void * ptr)
+{
+	IPaddress ip[2];
+	TCPsocket server[2];
+
+	if (SDLNet_ResolveHost (ip+0, NULL, 9998) == -1)
+	{
+		printf("SDLNet_ResolveHost: %s\n", SDLNet_GetError());
+		exit(1);
+	}
+	if (SDLNet_ResolveHost (ip+1, NULL, 9999) == -1)
+	{
+		printf("SDLNet_ResolveHost: %s\n", SDLNet_GetError());
+		exit(1);
+	}
+
+	SDLNet_SocketSet socketset = test_open (server, ip, 2);
+
+	while(1)
+	{
+		int numready = SDLNet_CheckSockets (socketset, 1000);
+		if (numready == -1)
+		{
+			printf("SDLNet_CheckSockets: %s\n", SDLNet_GetError());
+			//most of the time this is a system error, where perror might help you.
+			perror("SDLNet_CheckSockets");
+		}
+		else if (numready)
+		{
+			printf("There are %d sockets with activity!\n", numready);
+			// check all sockets with SDLNet_SocketReady and handle the active ones.
+
+
+
+		}
+	}
+
+
+}
+
+
+
+
+
 
 int main (int argc, char * argv[])
 {
@@ -200,39 +251,17 @@ int main (int argc, char * argv[])
 		printf("SDLNet_Init: %s\n", SDLNet_GetError());
 		exit(2);
 	}
-	//SDL_Thread * thread = SDL_CreateThread (mypackage_receiver, "pointcloud_receiver", (void *)NULL);
+	SDL_Thread * thread = SDL_CreateThread (test, "test", (void *)NULL);
 
 	glEnable (GL_VERTEX_PROGRAM_POINT_SIZE);
 	glEnable (GL_BLEND);
 	glEnable (GL_DEPTH_TEST);
-	//glBlendFunc (GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
-
-	/*
-	global_imgctx.cap = 100;
-	global_imgctx.glprogram = csc_gl_program_from_files1 (CSC_SRCDIR"image.glvs;"CSC_SRCDIR"image.glfs");
-	glLinkProgram (global_imgctx.glprogram);
-	csc_glimage_init (&global_imgctx);
-
-
-
-	global_pointcloud.cap = 1000;
-	global_pointcloud.glprogram = csc_gl_program_from_files1 (CSC_SRCDIR"pointcloud.glvs;"CSC_SRCDIR"pointcloud.glfs");
-	glLinkProgram (global_pointcloud.glprogram);
-	csc_glpointcloud_init (&global_pointcloud);
-	*/
 
 
 	csc_gcam_init (&global_gcam);
 	v4f32_set_xyzw (global_gcam.p, 0.0f, 0.0f, -4.0f, 1.0f);
 
 
-	world = ecs_init();
-	components_init (world);
-	component_vao_init (world);
-	component_vbo_init (world);
-	component_tbo_init (world);
-	component_img_init (world);
-	component_img_test (world);
 
 
 
@@ -261,19 +290,16 @@ int main (int argc, char * argv[])
 
 		if (keyboard[SDL_SCANCODE_0])
 		{
-			glBindTexture (GL_TEXTURE_2D_ARRAY, global_texctx.tbo[0]);
 		}
 
 		if (keyboard[SDL_SCANCODE_1])
 		{
-			glBindTexture (GL_TEXTURE_2D_ARRAY, global_texctx.tbo[1]);
 		}
 
 		if (keyboard[SDL_SCANCODE_G])
 		{
 		}
 
-		ecs_progress(world, 0);
 		SDL_Delay (10);
 		SDL_GL_SwapWindow (window);
 	}
@@ -281,6 +307,5 @@ int main (int argc, char * argv[])
 	SDL_GL_DeleteContext (context);
 	SDL_DestroyWindow (window);
 	SDL_Quit();
-	ecs_fini(world);
 	return 0;
 }
