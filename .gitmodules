@@ -16,3 +16,6 @@
 [submodule "texturearray/csc"]
 	path = texturearray/csc
 	url = https://github.com/KenthJohan/csc
+[submodule "demo3/csc"]
+	path = demo3/csc
+	url = https://github.com/KenthJohan/csc
