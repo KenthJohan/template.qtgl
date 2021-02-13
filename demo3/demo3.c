@@ -72,8 +72,8 @@ int main (int argc, char * argv[])
 	}
 
 	ECS_TYPE (world, type_imgs, component_position, component_scale, component_quaternion, tag_glimgs);
-	ecs_entity_t const * e2 = ecs_bulk_new (world, type_imgs, 1);
-	for (int i = 0; i < 1; ++i)
+	ecs_entity_t const * e2 = ecs_bulk_new (world, type_imgs, 4);
+	for (int i = 0; i < 4; ++i)
 	{
 		ecs_set (world, e2[i], component_position, {0.0f, 0.0f, (float)i/2.0f, 0.0f});
 		ecs_set (world, e2[i], component_scale, {1.0f, (float)i/2.0f + 1.0f, 1.0f, 1.0f});
@@ -95,8 +95,8 @@ int main (int argc, char * argv[])
 			//Control graphics camera
 			csc_sdl_motion_wasd (keyboard, global_gcam.d);
 			csc_sdl_motion_pyr (keyboard, global_gcam.pyrd);
-			vsf32_mul (3, global_gcam.d, global_gcam.d, 0.01f);
-			vsf32_mul (3, global_gcam.pyrd, global_gcam.pyrd, 0.01f);
+			v3f32_mul (global_gcam.d, global_gcam.d, 0.01f);
+			v3f32_mul (global_gcam.pyrd, global_gcam.pyrd, 0.01f);
 			csc_gcam_update (&global_gcam);
 		}
 
@@ -106,26 +106,17 @@ int main (int argc, char * argv[])
 
 		if (keyboard[SDL_SCANCODE_1])
 		{
-			component_quaternion * q = ecs_get_mut (world, e3, component_quaternion, NULL);
-			component_quaternion q0;
-			qf32_xyza ((void*)&q0, 1.0f, 0.0f, 0.0f, 0.01f);
-			qf32_mul ((void*)q, (void*)q, (void*)&q0);
+			qf32_rotate2_xyza (*ecs_get_mut (world, e3, component_quaternion, NULL), 1.0f, 0.0f, 0.0f, 0.01f);
 		}
 
 		if (keyboard[SDL_SCANCODE_2])
 		{
-			component_quaternion * q = ecs_get_mut (world, e3, component_quaternion, NULL);
-			component_quaternion q0;
-			qf32_xyza ((void*)&q0, 0.0f, 1.0f, 0.0f, 0.01f);
-			qf32_mul ((void*)q, (void*)q, (void*)&q0);
+			qf32_rotate2_xyza (*ecs_get_mut (world, e3, component_quaternion, NULL), 0.0f, 1.0f, 0.0f, 0.01f);
 		}
 
 		if (keyboard[SDL_SCANCODE_3])
 		{
-			component_quaternion * q = ecs_get_mut (world, e3, component_quaternion, NULL);
-			component_quaternion q0;
-			qf32_xyza ((void*)&q0, 0.0f, 0.0f, 1.0f, 0.01f);
-			qf32_mul ((void*)q, (void*)q, (void*)&q0);
+			qf32_rotate2_xyza (*ecs_get_mut (world, e3, component_quaternion, NULL), 0.0f, 0.0f, 1.0f, 0.01f);
 		}
 
 		/*

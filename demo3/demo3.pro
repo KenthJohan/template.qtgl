@@ -6,6 +6,9 @@ CONFIG -= qt
 DEFINES += CSC_SRCDIR=\\\"../demo3/\\\"
 #DEFINES += DEBUG
 
+HEADERS += csc/csc_math.h
+HEADERS += csc/csc_qf32.h
+
 QMAKE_CFLAGS += -Wno-unused-function
 QMAKE_CFLAGS += -Wno-missing-braces
 QMAKE_CFLAGS += -Wno-unused-parameter
