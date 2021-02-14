@@ -21,10 +21,14 @@ ECS_COMPONENT_DECLARE (component_texture);
 
 static void component_tbo_onadd (ecs_iter_t *it)
 {
-	printf ("component_tbo_onadd\n");
-	ECS_COLUMN (it, component_tbo, tbo, 1);
-	glGenTextures (it->count, tbo);
-	for (int32_t i = 0; i < it->count; ++i){}
+	printf ("component_tbo_onadd: ");
+	ECS_COLUMN (it, component_tbo, t, 1);
+	glGenTextures (it->count, t);
+	for (int32_t i = 0; i < it->count; ++i)
+	{
+		printf ("%i, ", t[i]);
+	}
+	printf ("\n");
 }
 
 

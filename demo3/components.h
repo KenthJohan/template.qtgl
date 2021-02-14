@@ -19,7 +19,10 @@ typedef qf32 component_quaternion;
 typedef v4f32 component_applyrotation;
 typedef v2f32 component_uv;
 typedef v2f32 component_wh;
-
+typedef struct component_controller
+{
+	const Uint8 * keyboard;
+} component_controller;
 
 
 
@@ -31,6 +34,7 @@ ECS_COMPONENT_DECLARE (component_quaternion);
 ECS_COMPONENT_DECLARE (component_applyrotation);
 ECS_COMPONENT_DECLARE (component_uv);
 ECS_COMPONENT_DECLARE (component_wh);
+ECS_COMPONENT_DECLARE (component_controller);
 ECS_TAG_DECLARE (tag_glpoints);
 ECS_TAG_DECLARE (tag_glimgs);
 ECS_TAG_DECLARE (tag_gltriangles);
@@ -120,8 +124,8 @@ static void system_render_imgs (ecs_iter_t *it)
 		m4f32_translation (mt, p[i]);
 		m4f32_scale (mt, s[i]);
 		qf32_m4 (mr, q[i]);
-		m4f32_mul (m, mt, m); //Apply translation
 		m4f32_mul (m, mr, m); //Apply rotation
+		m4f32_mul (m, mt, m); //Apply translation
 		m4f32_mul (m, global_gcam.mvp, m);
 		//m4f32_print (global_gcam.mvp, stdout);
 		glUniformMatrix4fv (global_gluniform[GLUNIFORM_IMGS_MVP], 1, GL_FALSE, (const GLfloat *) m);
@@ -133,10 +137,10 @@ static void system_render_imgs (ecs_iter_t *it)
 static void system_apply_rotation (ecs_iter_t *it)
 {
 	ECS_COLUMN (it, component_quaternion, q, 1);
-	ECS_COLUMN (it, component_applyrotation, s, 2);
+	ECS_COLUMN (it, component_controller, c, 2);
 	for (int32_t i = 0; i < it->count; ++i)
 	{
-		qf32_mul (q[i], q[i], s[i]);
+		qf32_rotate2_xyza (q[i], c->keyboard[SDL_SCANCODE_1], c->keyboard[SDL_SCANCODE_2], c->keyboard[SDL_SCANCODE_3], 0.01f);
 	}
 }
 
@@ -151,12 +155,13 @@ static void components_init (ecs_world_t * world)
 	ECS_COMPONENT_DEFINE(world, component_applyrotation);
 	ECS_COMPONENT_DEFINE(world, component_uv);
 	ECS_COMPONENT_DEFINE(world, component_wh);
+	ECS_COMPONENT_DEFINE(world, component_controller);
 	ECS_TAG_DEFINE(world, tag_glpoints);
 	ECS_TAG_DEFINE(world, tag_glimgs);
 	ECS_TAG_DEFINE(world, tag_gltriangles);
 	ECS_SYSTEM(world, system_render_points, EcsOnUpdate, component_position, tag_glpoints);
 	ECS_SYSTEM(world, system_render_imgs, EcsOnUpdate, component_position, component_scale, component_quaternion, SHARED:component_tbo, tag_glimgs);
-	ECS_SYSTEM(world, system_apply_rotation, EcsOnUpdate, component_quaternion, component_applyrotation);
+	ECS_SYSTEM(world, system_apply_rotation, EcsOnUpdate, component_quaternion, $component_controller);
 
 	global_glprogram[GLPROGRAM_TRIANGLES] = csc_gl_program_from_files1 (CSC_SRCDIR"shader_pointcloud.glvs;"CSC_SRCDIR"shader_pointcloud.glfs");
 	global_glprogram[GLPROGRAM_POINTS] = csc_gl_program_from_files1 (CSC_SRCDIR"shader_pointcloud.glvs;"CSC_SRCDIR"shader_pointcloud.glfs");

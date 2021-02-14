@@ -30,34 +30,13 @@
 
 
 
-static ecs_world_t * world;
+static ecs_world_t * global_world;
 
 
-int main (int argc, char * argv[])
+
+
+static void addents (ecs_world_t * world)
 {
-	csc_crossos_enable_ansi_color ();
-	ASSERT (argc);
-	ASSERT (argv);
-
-
-	uint32_t main_flags = CSC_SDLGLEW_RUNNING;
-
-	SDL_Window * window;
-	SDL_GLContext context;
-	csc_sdlglew_create_window (&window, &context, WIN_TITLE, WIN_X, WIN_Y, WIN_W, WIN_H, SDL_WINDOW_OPENGL);
-
-	glEnable (GL_VERTEX_PROGRAM_POINT_SIZE);
-	glEnable (GL_BLEND);
-	glEnable (GL_DEPTH_TEST);
-	//glBlendFunc (GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
-
-
-
-
-
-
-	world = ecs_init();
-	components_init (world);
 
 	ECS_ENTITY (world, mytexture1, component_tbo);
 	ecs_set (world, mytexture1, component_texture, {.unit = 0, .width = 100, .height = 100, .depth = 4});
@@ -86,12 +65,44 @@ int main (int argc, char * argv[])
 	ecs_add_entity (world, e2[1], ECS_INSTANCEOF | mytexture1);
 	ecs_add_entity (world, e2[2], ECS_INSTANCEOF | mytexture2);
 	ecs_add_entity (world, e2[3], ECS_INSTANCEOF | mytexture2);
+}
 
 
-	ecs_entity_t e3 = e2[0];
 
 
+int main (int argc, char * argv[])
+{
+	csc_crossos_enable_ansi_color ();
+	ASSERT (argc);
+	ASSERT (argv);
+
+
+	uint32_t main_flags = CSC_SDLGLEW_RUNNING;
+
+	SDL_Window * window;
+	SDL_GLContext context;
+	csc_sdlglew_create_window (&window, &context, WIN_TITLE, WIN_X, WIN_Y, WIN_W, WIN_H, SDL_WINDOW_OPENGL);
+
+	glEnable (GL_VERTEX_PROGRAM_POINT_SIZE);
+	glEnable (GL_BLEND);
+	glEnable (GL_DEPTH_TEST);
+	//glBlendFunc (GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+
+
+
+
+
+
+	global_world = ecs_init();
+	components_init (global_world);
+	addents (global_world);
+	//ecs_entity_t e3 = e2[0];
 	const Uint8 * keyboard = SDL_GetKeyboardState (NULL);
+	ecs_singleton_set (global_world, component_controller, {keyboard});
+
+
+
+
 	while (main_flags & CSC_SDLGLEW_RUNNING)
 	{
 		SDL_Event event;
@@ -113,9 +124,10 @@ int main (int argc, char * argv[])
 		glClear (GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
 
+
 		if (keyboard[SDL_SCANCODE_1])
 		{
-			qf32_rotate2_xyza (*ecs_get_mut (world, e3, component_quaternion, NULL), keyboard[SDL_SCANCODE_1], keyboard[SDL_SCANCODE_2], keyboard[SDL_SCANCODE_3], 0.01f);
+			//qf32_rotate2_xyza (*ecs_get_mut (global_world, e3, component_quaternion, NULL), keyboard[SDL_SCANCODE_1], keyboard[SDL_SCANCODE_2], keyboard[SDL_SCANCODE_3], 0.01f);
 		}
 
 		//if (keyboard[SDL_SCANCODE_2])
@@ -135,14 +147,14 @@ int main (int argc, char * argv[])
 		*/
 
 
-		ecs_progress (world, 0);
+		ecs_progress (global_world, 0);
 		SDL_Delay (10);
 		SDL_GL_SwapWindow (window);
 	}
 
 	SDL_GL_DeleteContext (context);
 	SDL_DestroyWindow (window);
-	SDL_Quit();
-	ecs_fini(world);
+	SDL_Quit ();
+	ecs_fini (global_world);
 	return 0;
 }
