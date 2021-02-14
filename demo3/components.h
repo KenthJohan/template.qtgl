@@ -6,11 +6,17 @@
 #include "csc/csc_math.h"
 #include "csc/csc_gl.h"
 #include "csc/csc_gcam.h"
+#include "csc/csc_qf32.h"
+
+
+#include "component_tbo.h"
+
 
 typedef uint32_t component_color;
 typedef v4f32 component_position;
 typedef v4f32 component_scale;
-typedef v4f32 component_quaternion;
+typedef qf32 component_quaternion;
+typedef v4f32 component_applyrotation;
 typedef v2f32 component_uv;
 typedef v2f32 component_wh;
 
@@ -22,6 +28,7 @@ ECS_COMPONENT_DECLARE (component_color);
 ECS_COMPONENT_DECLARE (component_position);
 ECS_COMPONENT_DECLARE (component_scale);
 ECS_COMPONENT_DECLARE (component_quaternion);
+ECS_COMPONENT_DECLARE (component_applyrotation);
 ECS_COMPONENT_DECLARE (component_uv);
 ECS_COMPONENT_DECLARE (component_wh);
 ECS_TAG_DECLARE (tag_glpoints);
@@ -44,13 +51,6 @@ enum vbo_type
 	VBO_IMGS_POS,
 	VBO_IMGS_UV,
 	VBO_COUNT
-};
-
-enum vto_type
-{
-	VTO1,
-	VTO2,
-	VTO_COUNT
 };
 
 enum glprogram_type
@@ -78,7 +78,6 @@ enum gluniform_type
 
 static GLuint global_vao[VAO_COUNT];
 static GLuint global_vbo[VBO_COUNT];
-static GLuint global_vto[VTO_COUNT];
 static GLint global_glprogram[GLPROGRAM_COUNT];
 static GLint global_gluniform[GLUNIFORM_COUNT];
 static struct csc_gcam global_gcam;
@@ -99,11 +98,14 @@ static void system_render_points(ecs_iter_t *it)
 }
 
 
-static void system_render_imgs(ecs_iter_t *it)
+static void system_render_imgs (ecs_iter_t *it)
 {
 	ECS_COLUMN (it, component_position, p, 1);
 	ECS_COLUMN (it, component_scale, s, 2);
 	ECS_COLUMN (it, component_quaternion, q, 3);
+	ECS_COLUMN (it, component_tbo, t, 4);
+	glActiveTexture (GL_TEXTURE0);
+	glBindTexture (GL_TEXTURE_2D_ARRAY, t[0]);
 	glBindVertexArray (global_vao[VAO_IMGS]);
 	glUseProgram (global_glprogram[GLPROGRAM_IMGS]);
 	glUniform1i (global_gluniform[GLUNIFORM_IMGS_TEX0], 0);
@@ -116,7 +118,7 @@ static void system_render_imgs(ecs_iter_t *it)
 		m4f32_identity (mr);
 		m4f32_identity (mt);
 		m4f32_translation (mt, p[i]);
-		m4f32_scale_xyz (mt, s[i][0], s[i][1], s[i][2]);
+		m4f32_scale (mt, s[i]);
 		qf32_m4 (mr, q[i]);
 		m4f32_mul (m, mt, m); //Apply translation
 		m4f32_mul (m, mr, m); //Apply rotation
@@ -128,20 +130,33 @@ static void system_render_imgs(ecs_iter_t *it)
 }
 
 
+static void system_apply_rotation (ecs_iter_t *it)
+{
+	ECS_COLUMN (it, component_quaternion, q, 1);
+	ECS_COLUMN (it, component_applyrotation, s, 2);
+	for (int32_t i = 0; i < it->count; ++i)
+	{
+		qf32_mul (q[i], q[i], s[i]);
+	}
+}
+
 
 static void components_init (ecs_world_t * world)
 {
+	component_tbo_init (world);
 	ECS_COMPONENT_DEFINE(world, component_color);
 	ECS_COMPONENT_DEFINE(world, component_position);
 	ECS_COMPONENT_DEFINE(world, component_scale);
 	ECS_COMPONENT_DEFINE(world, component_quaternion);
+	ECS_COMPONENT_DEFINE(world, component_applyrotation);
 	ECS_COMPONENT_DEFINE(world, component_uv);
 	ECS_COMPONENT_DEFINE(world, component_wh);
 	ECS_TAG_DEFINE(world, tag_glpoints);
 	ECS_TAG_DEFINE(world, tag_glimgs);
 	ECS_TAG_DEFINE(world, tag_gltriangles);
 	ECS_SYSTEM(world, system_render_points, EcsOnUpdate, component_position, tag_glpoints);
-	ECS_SYSTEM(world, system_render_imgs, EcsOnUpdate, component_position, component_scale, component_quaternion, tag_glimgs);
+	ECS_SYSTEM(world, system_render_imgs, EcsOnUpdate, component_position, component_scale, component_quaternion, SHARED:component_tbo, tag_glimgs);
+	ECS_SYSTEM(world, system_apply_rotation, EcsOnUpdate, component_quaternion, component_applyrotation);
 
 	global_glprogram[GLPROGRAM_TRIANGLES] = csc_gl_program_from_files1 (CSC_SRCDIR"shader_pointcloud.glvs;"CSC_SRCDIR"shader_pointcloud.glfs");
 	global_glprogram[GLPROGRAM_POINTS] = csc_gl_program_from_files1 (CSC_SRCDIR"shader_pointcloud.glvs;"CSC_SRCDIR"shader_pointcloud.glfs");
@@ -188,7 +203,7 @@ static void components_init (ecs_world_t * world)
 		glVertexAttribPointer (1, 2, GL_FLOAT, GL_FALSE, 0, (void*)(intptr_t)0);
 		component_uv * uv = malloc (MYGL_MAX_IMGS * 6 * sizeof (component_uv));
 		csc_gl_make_rectangle_uv ((void*)uv, MYGL_MAX_IMGS, 2);
-		glBufferData (GL_ARRAY_BUFFER, MYGL_MAX_IMGS * 6 * sizeof (component_uv), NULL, GL_DYNAMIC_DRAW);
+		glBufferData (GL_ARRAY_BUFFER, MYGL_MAX_IMGS * 6 * sizeof (component_uv), uv, GL_DYNAMIC_DRAW);
 		free (uv);
 	}
 

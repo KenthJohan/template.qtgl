@@ -19,6 +19,7 @@
 
 
 #include "components.h"
+#include "component_tbo.h"
 
 
 #define WIN_X SDL_WINDOWPOS_UNDEFINED
@@ -27,12 +28,6 @@
 #define WIN_H 480
 #define WIN_TITLE "Demo3"
 
-
-
-
-#define COMP_POS 0
-#define COMP_VEL 1
-#define COMP_MASS 2
 
 
 static ecs_world_t * world;
@@ -64,6 +59,12 @@ int main (int argc, char * argv[])
 	world = ecs_init();
 	components_init (world);
 
+	ECS_ENTITY (world, mytexture1, component_tbo);
+	ecs_set (world, mytexture1, component_texture, {.unit = 0, .width = 100, .height = 100, .depth = 4});
+	ECS_ENTITY (world, mytexture2, component_tbo);
+	ecs_set (world, mytexture2, component_texture, {.unit = 0, .width = 50, .height = 50, .depth = 4});
+
+
 	ECS_TYPE (world, type_points, component_position, tag_glpoints);
 	ecs_entity_t const * e1 = ecs_bulk_new (world, type_points, 100);
 	for (int i = 0; i < 100; ++i)
@@ -79,6 +80,14 @@ int main (int argc, char * argv[])
 		ecs_set (world, e2[i], component_scale, {1.0f, (float)i/2.0f + 1.0f, 1.0f, 1.0f});
 		ecs_set (world, e2[i], component_quaternion, {1.0f, 0.0f, 0.0f, 0.0f});
 	}
+
+
+	ecs_add_entity (world, e2[0], ECS_INSTANCEOF | mytexture1);
+	ecs_add_entity (world, e2[1], ECS_INSTANCEOF | mytexture1);
+	ecs_add_entity (world, e2[2], ECS_INSTANCEOF | mytexture2);
+	ecs_add_entity (world, e2[3], ECS_INSTANCEOF | mytexture2);
+
+
 	ecs_entity_t e3 = e2[0];
 
 
@@ -106,17 +115,17 @@ int main (int argc, char * argv[])
 
 		if (keyboard[SDL_SCANCODE_1])
 		{
-			qf32_rotate2_xyza (*ecs_get_mut (world, e3, component_quaternion, NULL), 1.0f, 0.0f, 0.0f, 0.01f);
+			qf32_rotate2_xyza (*ecs_get_mut (world, e3, component_quaternion, NULL), keyboard[SDL_SCANCODE_1], keyboard[SDL_SCANCODE_2], keyboard[SDL_SCANCODE_3], 0.01f);
 		}
 
-		if (keyboard[SDL_SCANCODE_2])
+		//if (keyboard[SDL_SCANCODE_2])
 		{
-			qf32_rotate2_xyza (*ecs_get_mut (world, e3, component_quaternion, NULL), 0.0f, 1.0f, 0.0f, 0.01f);
+			//qf32_rotate2_xyza (*ecs_get_mut (world, e3, component_quaternion, NULL), 0.0f, 1.0f, 0.0f, 0.01f);
 		}
 
-		if (keyboard[SDL_SCANCODE_3])
+		//if (keyboard[SDL_SCANCODE_3])
 		{
-			qf32_rotate2_xyza (*ecs_get_mut (world, e3, component_quaternion, NULL), 0.0f, 0.0f, 1.0f, 0.01f);
+			//qf32_rotate2_xyza (*ecs_get_mut (world, e3, component_quaternion, NULL), 0.0f, 0.0f, 1.0f, 0.01f);
 		}
 
 		/*
@@ -126,7 +135,7 @@ int main (int argc, char * argv[])
 		*/
 
 
-		ecs_progress(world, 0);
+		ecs_progress (world, 0);
 		SDL_Delay (10);
 		SDL_GL_SwapWindow (window);
 	}
