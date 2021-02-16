@@ -32,6 +32,7 @@ static void component_tbo_onadd (ecs_iter_t *it)
 }
 
 
+
 static void fill_texture (uint8_t * data, int w, int h, uint32_t c, uint32_t n)
 {
 	memset (data, 0, w * h * c);

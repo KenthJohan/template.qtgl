@@ -7,10 +7,12 @@ DEFINES += CSC_SRCDIR=\\\"../demo3/\\\"
 #DEFINES += DEBUG
 
 HEADERS += csc/csc_math.h
-HEADERS += csc/csc_macromath.h
 HEADERS += csc/csc_qf32.h
 HEADERS += csc/csc_v3f32.h
 HEADERS += csc/csc_v4f32.h
+HEADERS += components.h
+HEADERS += systems.h
+
 
 QMAKE_CFLAGS += -Wno-unused-function
 QMAKE_CFLAGS += -Wno-missing-braces

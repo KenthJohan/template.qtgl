@@ -1,7 +1,6 @@
 #pragma once
 
 #include <flecs.h>
-#include <GL/glew.h>
 
 #include "csc/csc_math.h"
 #include "csc/csc_gl.h"
@@ -9,53 +8,62 @@
 #include "csc/csc_qf32.h"
 
 
-#include "component_tbo.h"
-
-
+typedef uint32_t component_tbo;
 typedef uint32_t component_color;
 typedef v4f32 component_position;
 typedef v4f32 component_scale;
 typedef qf32 component_quaternion;
 typedef v4f32 component_applyrotation;
 typedef v2f32 component_uv;
-typedef v2f32 component_wh;
+typedef v2f32 component_rectangle;
 typedef struct component_controller
 {
-	const Uint8 * keyboard;
+	const uint8_t * keyboard; //SDL Keyboard
 } component_controller;
+typedef struct component_texture
+{
+	uint32_t unit;
+	uint32_t width;
+	uint32_t height;
+	uint32_t depth;
+} component_texture;
+typedef struct component_pointcloud
+{
+	uint32_t vao;
+	uint32_t vboc;
+	uint32_t vbop;
+} component_pointcloud;
+typedef struct component_mesh
+{
+	uint32_t vbop;
+	uint32_t vbot;
+} component_mesh;
+typedef uint32_t component_vbo;
+typedef uint32_t component_va;
+typedef uint32_t component_stride;
+typedef uint32_t component_count;
+typedef uint32_t component_vao;
 
 
-
-
+ECS_COMPONENT_DECLARE (component_tbo);
+ECS_COMPONENT_DECLARE (component_texture);
 ECS_COMPONENT_DECLARE (component_color);
 ECS_COMPONENT_DECLARE (component_position);
 ECS_COMPONENT_DECLARE (component_scale);
 ECS_COMPONENT_DECLARE (component_quaternion);
 ECS_COMPONENT_DECLARE (component_applyrotation);
 ECS_COMPONENT_DECLARE (component_uv);
-ECS_COMPONENT_DECLARE (component_wh);
+ECS_COMPONENT_DECLARE (component_rectangle);
 ECS_COMPONENT_DECLARE (component_controller);
-ECS_TAG_DECLARE (tag_glpoints);
-ECS_TAG_DECLARE (tag_glimgs);
-ECS_TAG_DECLARE (tag_gltriangles);
+ECS_COMPONENT_DECLARE (component_vbo);
+ECS_COMPONENT_DECLARE (component_va);
+ECS_COMPONENT_DECLARE (component_stride);
+ECS_COMPONENT_DECLARE (component_count);
+ECS_COMPONENT_DECLARE (component_vao);
+ECS_COMPONENT_DECLARE (component_pointcloud);
+ECS_COMPONENT_DECLARE (component_mesh);
 
-enum vao_type
-{
-	VAO_TRIANGLES,
-	VAO_POINTS,
-	VAO_IMGS,
-	VAO_COUNT
-};
 
-enum vbo_type
-{
-	VBO_TRIANGLES_POS,
-	VBO_POINTS_POS,
-	VBO_POINTS_COL,
-	VBO_IMGS_POS,
-	VBO_IMGS_UV,
-	VBO_COUNT
-};
 
 enum glprogram_type
 {
@@ -80,146 +88,71 @@ enum gluniform_type
 
 
 
-static GLuint global_vao[VAO_COUNT];
-static GLuint global_vbo[VBO_COUNT];
-static GLint global_glprogram[GLPROGRAM_COUNT];
-static GLint global_gluniform[GLUNIFORM_COUNT];
-static struct csc_gcam global_gcam;
 
-static void system_render_points(ecs_iter_t *it)
+
+enum myattr
 {
-	ECS_COLUMN (it, component_position, position, 1);
-	glBindVertexArray (global_vao[VAO_POINTS]);
-	for (int32_t i = 0; i < it->count; ++i)
-	{
+	ATTR_COUNT,
+	ATTR_STRIDE,
+	ATTR_POINTCLOUD,
+};
 
-	}
-	glBindBuffer (GL_ARRAY_BUFFER, global_vbo[VBO_POINTS_POS]);
-	glBufferSubData (GL_ARRAY_BUFFER, 0, it->count * sizeof (component_position), position);
-	glUseProgram (global_glprogram[GLPROGRAM_POINTS]);
-	glUniformMatrix4fv (global_gluniform[GLUNIFORM_POINTS_MVP], 1, GL_FALSE, (const GLfloat *) global_gcam.mvp);
-	glDrawArrays (GL_POINTS, 0, it->count);
-}
-
-
-static void system_render_imgs (ecs_iter_t *it)
+struct mynet_eav
 {
-	ECS_COLUMN (it, component_position, p, 1);
-	ECS_COLUMN (it, component_scale, s, 2);
-	ECS_COLUMN (it, component_quaternion, q, 3);
-	ECS_COLUMN (it, component_tbo, t, 4);
-	glActiveTexture (GL_TEXTURE0);
-	glBindTexture (GL_TEXTURE_2D_ARRAY, t[0]);
-	glBindVertexArray (global_vao[VAO_IMGS]);
-	glUseProgram (global_glprogram[GLPROGRAM_IMGS]);
-	glUniform1i (global_gluniform[GLUNIFORM_IMGS_TEX0], 0);
-	for (int32_t i = 0; i < it->count; ++i)
+	uint32_t entity;
+	uint32_t attribute;
+	uint8_t value[0];
+};
+
+struct mynet_eav_u32
+{
+	uint32_t entity;
+	uint32_t attribute;
+	uint32_t value;
+};
+
+
+
+static void receiver (ecs_world_t * world, ecs_entity_t const e[], void * ptr)
+{
+	struct mynet_eav * eav = ptr;
+	switch (eav->attribute)
 	{
-		float m[4*4];
-		float mt[4*4];
-		float mr[4*4];
-		m4f32_identity (m);
-		m4f32_identity (mr);
-		m4f32_identity (mt);
-		m4f32_translation (mt, p[i]);
-		m4f32_scale (mt, s[i]);
-		qf32_m4 (mr, q[i]);
-		m4f32_mul (m, mr, m); //Apply rotation
-		m4f32_mul (m, mt, m); //Apply translation
-		m4f32_mul (m, global_gcam.mvp, m);
-		//m4f32_print (global_gcam.mvp, stdout);
-		glUniformMatrix4fv (global_gluniform[GLUNIFORM_IMGS_MVP], 1, GL_FALSE, (const GLfloat *) m);
-		glDrawArrays (GL_TRIANGLES, i * 6, 6);
+	case ATTR_COUNT:{
+		struct mynet_eav_u32 * eav32 = ptr;
+		ecs_set (world, e[eav->entity], component_count, {eav32->value});
+		break;}
+	case ATTR_STRIDE:{
+		struct mynet_eav_u32 * eav32 = ptr;
+		ecs_set (world, e[eav->entity], component_stride, {eav32->value});
+		break;}
+	case ATTR_POINTCLOUD:
+		ecs_add (world, e[eav->entity], component_pointcloud);
+		break;
 	}
 }
 
 
-static void system_apply_rotation (ecs_iter_t *it)
+void mynet_test (ecs_world_t * world)
 {
-	ECS_COLUMN (it, component_quaternion, q, 1);
-	ECS_COLUMN (it, component_controller, c, 2);
-	for (int32_t i = 0; i < it->count; ++i)
-	{
-		qf32_rotate2_xyza (q[i], c->keyboard[SDL_SCANCODE_1], c->keyboard[SDL_SCANCODE_2], c->keyboard[SDL_SCANCODE_3], 0.01f);
-	}
+	ecs_entity_t const * e = ecs_bulk_new (world, 0, 4);
+
+
+	receiver(world, e, &(struct mynet_eav){0, ATTR_POINTCLOUD});
+	receiver(world, e, &(struct mynet_eav_u32){0, ATTR_COUNT, 10000});
+
 }
 
 
-static void components_init (ecs_world_t * world)
-{
-	component_tbo_init (world);
-	ECS_COMPONENT_DEFINE(world, component_color);
-	ECS_COMPONENT_DEFINE(world, component_position);
-	ECS_COMPONENT_DEFINE(world, component_scale);
-	ECS_COMPONENT_DEFINE(world, component_quaternion);
-	ECS_COMPONENT_DEFINE(world, component_applyrotation);
-	ECS_COMPONENT_DEFINE(world, component_uv);
-	ECS_COMPONENT_DEFINE(world, component_wh);
-	ECS_COMPONENT_DEFINE(world, component_controller);
-	ECS_TAG_DEFINE(world, tag_glpoints);
-	ECS_TAG_DEFINE(world, tag_glimgs);
-	ECS_TAG_DEFINE(world, tag_gltriangles);
-	ECS_SYSTEM(world, system_render_points, EcsOnUpdate, component_position, tag_glpoints);
-	ECS_SYSTEM(world, system_render_imgs, EcsOnUpdate, component_position, component_scale, component_quaternion, SHARED:component_tbo, tag_glimgs);
-	ECS_SYSTEM(world, system_apply_rotation, EcsOnUpdate, component_quaternion, $component_controller);
 
-	global_glprogram[GLPROGRAM_TRIANGLES] = csc_gl_program_from_files1 (CSC_SRCDIR"shader_pointcloud.glvs;"CSC_SRCDIR"shader_pointcloud.glfs");
-	global_glprogram[GLPROGRAM_POINTS] = csc_gl_program_from_files1 (CSC_SRCDIR"shader_pointcloud.glvs;"CSC_SRCDIR"shader_pointcloud.glfs");
-	global_glprogram[GLPROGRAM_IMGS] = csc_gl_program_from_files1 (CSC_SRCDIR"shader_image.glvs;"CSC_SRCDIR"shader_image.glfs");
-	glLinkProgram (global_glprogram[GLPROGRAM_TRIANGLES]);
-	glLinkProgram (global_glprogram[GLPROGRAM_POINTS]);
-	glLinkProgram (global_glprogram[GLPROGRAM_IMGS]);
 
-	global_gluniform[GLUNIFORM_TRIANGLES_MVP] = glGetUniformLocation (global_glprogram[GLPROGRAM_TRIANGLES], "mvp");
-	global_gluniform[GLUNIFORM_POINTS_MVP] = glGetUniformLocation (global_glprogram[GLPROGRAM_POINTS], "mvp");
-	global_gluniform[GLUNIFORM_IMGS_MVP] = glGetUniformLocation (global_glprogram[GLPROGRAM_IMGS], "mvp");
-	global_gluniform[GLUNIFORM_IMGS_TEX0] = glGetUniformLocation (global_glprogram[GLPROGRAM_IMGS], "tex0");
 
-	glGenVertexArrays (VAO_COUNT, global_vao);
-	glGenBuffers (VBO_COUNT, global_vbo);
-	glGenTextures (VAO_COUNT, global_vao);
 
-	{
-		glBindVertexArray (global_vao[VAO_POINTS]);
-		glBindBuffer (GL_ARRAY_BUFFER, global_vbo[VBO_POINTS_POS]);
-		glBufferData (GL_ARRAY_BUFFER, MYGL_MAX_POINTS * sizeof (component_position), NULL, GL_DYNAMIC_DRAW);
-		glEnableVertexAttribArray (0);
-		glVertexAttribPointer (0, 4, GL_FLOAT, GL_FALSE, 0, (void*)(intptr_t)0);
-		glBindBuffer (GL_ARRAY_BUFFER, global_vbo[VBO_POINTS_COL]);
-		glBufferData (GL_ARRAY_BUFFER, MYGL_MAX_POINTS * sizeof (component_color), NULL, GL_DYNAMIC_DRAW);
-		glEnableVertexAttribArray (1);
-		glVertexAttribPointer (1, 4, GL_UNSIGNED_BYTE, GL_TRUE, 0, (void*)(intptr_t)0);
-	}
 
-	{
-		glBindVertexArray (global_vao[VAO_IMGS]);
-		glBindBuffer (GL_ARRAY_BUFFER, global_vbo[VBO_IMGS_POS]);
-		glVertexAttribPointer (0, 4, GL_FLOAT, GL_FALSE, 0, (void*)(intptr_t)0);
-		glEnableVertexAttribArray (0);
-		component_position * p = malloc (MYGL_MAX_IMGS * 6 * sizeof (component_position));
-		for (int32_t i = 0; i < MYGL_MAX_IMGS; ++i)
-		{
-			csc_gl_make_rectangle_pos ((void*)(p + i*6), 0.0f, 0.0f, 0.0f, 0.0f, 1.0f, 1.0f, 4);
-		}
-		glBufferData (GL_ARRAY_BUFFER, MYGL_MAX_IMGS * 6 * sizeof (component_position), p, GL_DYNAMIC_DRAW);
-		free (p);
-		glBindBuffer (GL_ARRAY_BUFFER, global_vbo[VBO_IMGS_UV]);
-		glEnableVertexAttribArray (1);
-		glVertexAttribPointer (1, 2, GL_FLOAT, GL_FALSE, 0, (void*)(intptr_t)0);
-		component_uv * uv = malloc (MYGL_MAX_IMGS * 6 * sizeof (component_uv));
-		csc_gl_make_rectangle_uv ((void*)uv, MYGL_MAX_IMGS, 2);
-		glBufferData (GL_ARRAY_BUFFER, MYGL_MAX_IMGS * 6 * sizeof (component_uv), uv, GL_DYNAMIC_DRAW);
-		free (uv);
-	}
 
-	{
-		glBindVertexArray (global_vao[VAO_TRIANGLES]);
-		glBindBuffer (GL_ARRAY_BUFFER, global_vbo[VBO_TRIANGLES_POS]);
-		glVertexAttribPointer (0, 4, GL_FLOAT, GL_FALSE, 0, (void*)(intptr_t)0);
-		glBufferData (GL_ARRAY_BUFFER, MYGL_MAX_TRIANGLES * 3 * sizeof (component_position), NULL, GL_DYNAMIC_DRAW);
-		glEnableVertexAttribArray (0);
-	}
 
-	csc_gcam_init (&global_gcam);
-	v4f32_set_xyzw (global_gcam.p, 0.0f, 0.0f, -1.0f, 1.0f);
-}
+
+
+
+
+

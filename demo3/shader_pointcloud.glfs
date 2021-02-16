@@ -7,8 +7,8 @@ in vec4 color;
 void main()
 {
 	fragcolor = color;
-	fragcolor.r = 1.0;
-	fragcolor.g = 1.0;
-	fragcolor.b = 1.0;
-	fragcolor.a = 1.0;
+	//fragcolor.r = 1.0;
+	//fragcolor.g = 1.0;
+	//fragcolor.b = 1.0;
+	//fragcolor.a = 1.0;
 }

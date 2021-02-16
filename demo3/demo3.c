@@ -19,7 +19,7 @@
 
 
 #include "components.h"
-#include "component_tbo.h"
+#include "systems.h"
 
 
 #define WIN_X SDL_WINDOWPOS_UNDEFINED
@@ -30,7 +30,7 @@
 
 
 
-static ecs_world_t * global_world;
+
 
 
 
@@ -39,32 +39,32 @@ static void addents (ecs_world_t * world)
 {
 
 	ECS_ENTITY (world, mytexture1, component_tbo);
-	ecs_set (world, mytexture1, component_texture, {.unit = 0, .width = 100, .height = 100, .depth = 4});
 	ECS_ENTITY (world, mytexture2, component_tbo);
+	ECS_ENTITY (world, mytexture3, component_tbo);
+	ecs_set (world, mytexture1, component_texture, {.unit = 0, .width = 100, .height = 100, .depth = 4});
 	ecs_set (world, mytexture2, component_texture, {.unit = 0, .width = 50, .height = 50, .depth = 4});
+	ecs_set (world, mytexture3, component_texture, {.unit = 0, .width = 200, .height = 200, .depth = 4});
 
+	ECS_ENTITY (world, img, component_mesh, component_vao);
+	ecs_set (world, img, component_count, {6});
+	ecs_set (world, img, component_rectangle, {1.0f, 1.0f});
 
-	ECS_TYPE (world, type_points, component_position, tag_glpoints);
-	ecs_entity_t const * e1 = ecs_bulk_new (world, type_points, 100);
-	for (int i = 0; i < 100; ++i)
-	{
-		ecs_set (world, e1[i], component_position, {(float)i/10.0f, 0.0f, 0.0f, 10.0f});
-	}
-
-	ECS_TYPE (world, type_imgs, component_position, component_scale, component_quaternion, tag_glimgs);
-	ecs_entity_t const * e2 = ecs_bulk_new (world, type_imgs, 4);
-	for (int i = 0; i < 4; ++i)
-	{
-		ecs_set (world, e2[i], component_position, {0.0f, 0.0f, (float)i/2.0f, 0.0f});
-		ecs_set (world, e2[i], component_scale, {1.0f, (float)i/2.0f + 1.0f, 1.0f, 1.0f});
-		ecs_set (world, e2[i], component_quaternion, {1.0f, 0.0f, 0.0f, 0.0f});
-	}
-
-
+	ecs_entity_t const * e2 = ecs_bulk_new (world, 0, 4);
 	ecs_add_entity (world, e2[0], ECS_INSTANCEOF | mytexture1);
 	ecs_add_entity (world, e2[1], ECS_INSTANCEOF | mytexture1);
 	ecs_add_entity (world, e2[2], ECS_INSTANCEOF | mytexture2);
-	ecs_add_entity (world, e2[3], ECS_INSTANCEOF | mytexture2);
+	ecs_add_entity (world, e2[3], ECS_INSTANCEOF | mytexture3);
+
+	ecs_add_entity (world, e2[0], ECS_INSTANCEOF | img);
+	ecs_add_entity (world, e2[1], ECS_INSTANCEOF | img);
+	ecs_add_entity (world, e2[2], ECS_INSTANCEOF | img);
+	ecs_add_entity (world, e2[3], ECS_INSTANCEOF | img);
+	for (int i = 0; i < 4; ++i)
+	{
+		ecs_set (world, e2[i], component_scale, {(float)(i+1)/10.0f, (float)(i+1)/10.0f, 1.0f, 1.0f});
+		ecs_set (world, e2[i], component_quaternion, {1.0f, 0.0f, 0.0f, 0.0f});
+		ecs_set (world, e2[i], component_position, {0.0f, 0.0f, (float)i/2.0f, 0.0f});
+	}
 }
 
 
@@ -91,14 +91,12 @@ int main (int argc, char * argv[])
 
 
 
-
-
-	global_world = ecs_init();
-	components_init (global_world);
-	addents (global_world);
+	ecs_world_t * world = ecs_init();
+	systems_init (world);
+	addents (world);
 	//ecs_entity_t e3 = e2[0];
-	const Uint8 * keyboard = SDL_GetKeyboardState (NULL);
-	ecs_singleton_set (global_world, component_controller, {keyboard});
+	const uint8_t * keyboard = SDL_GetKeyboardState (NULL);
+	ecs_singleton_set (world, component_controller, {keyboard});
 
 
 
@@ -147,7 +145,7 @@ int main (int argc, char * argv[])
 		*/
 
 
-		ecs_progress (global_world, 0);
+		ecs_progress (world, 0);
 		SDL_Delay (10);
 		SDL_GL_SwapWindow (window);
 	}
@@ -155,6 +153,6 @@ int main (int argc, char * argv[])
 	SDL_GL_DeleteContext (context);
 	SDL_DestroyWindow (window);
 	SDL_Quit ();
-	ecs_fini (global_world);
+	ecs_fini (world);
 	return 0;
 }

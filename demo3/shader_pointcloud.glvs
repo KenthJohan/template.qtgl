@@ -9,6 +9,6 @@ void main()
 {
 	gl_Position = mvp * vec4(vpos.xyz, 1.0);
 	gl_PointSize = vpos.w / gl_Position.w;
-	color = vcol + vec4(1.0f, 1.0f, 1.0f, 1.0f);
+	color = vcol;
 }
 
