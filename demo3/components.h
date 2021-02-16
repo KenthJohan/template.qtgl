@@ -45,40 +45,45 @@ typedef uint32_t component_count;
 typedef uint32_t component_vao;
 
 
+//OpenGL:
 ECS_COMPONENT_DECLARE (component_tbo);
+ECS_COMPONENT_DECLARE (component_vbo);
+ECS_COMPONENT_DECLARE (component_vao);
+ECS_COMPONENT_DECLARE (component_va);
+ECS_COMPONENT_DECLARE (component_pointcloud);
+ECS_COMPONENT_DECLARE (component_mesh);
+
+//Misc:
+ECS_COMPONENT_DECLARE (component_stride);
+ECS_COMPONENT_DECLARE (component_count);
 ECS_COMPONENT_DECLARE (component_texture);
 ECS_COMPONENT_DECLARE (component_color);
 ECS_COMPONENT_DECLARE (component_position);
 ECS_COMPONENT_DECLARE (component_scale);
 ECS_COMPONENT_DECLARE (component_quaternion);
-ECS_COMPONENT_DECLARE (component_applyrotation);
 ECS_COMPONENT_DECLARE (component_uv);
 ECS_COMPONENT_DECLARE (component_rectangle);
+
+//Input control:
 ECS_COMPONENT_DECLARE (component_controller);
-ECS_COMPONENT_DECLARE (component_vbo);
-ECS_COMPONENT_DECLARE (component_va);
-ECS_COMPONENT_DECLARE (component_stride);
-ECS_COMPONENT_DECLARE (component_count);
-ECS_COMPONENT_DECLARE (component_vao);
-ECS_COMPONENT_DECLARE (component_pointcloud);
-ECS_COMPONENT_DECLARE (component_mesh);
+
+//Application:
+ECS_COMPONENT_DECLARE (component_applyrotation);
 
 
 
 enum glprogram_type
 {
-	GLPROGRAM_TRIANGLES,
-	GLPROGRAM_POINTS,
-	GLPROGRAM_IMGS,
+	GLPROGRAM_POINT,
+	GLPROGRAM_MESH,
 	GLPROGRAM_COUNT,
 };
 
 enum gluniform_type
 {
-	GLUNIFORM_TRIANGLES_MVP,
-	GLUNIFORM_POINTS_MVP,
-	GLUNIFORM_IMGS_MVP,
-	GLUNIFORM_IMGS_TEX0,
+	GLUNIFORM_POINT_MVP,
+	GLUNIFORM_MESH_MVP,
+	GLUNIFORM_MESH_TEX0,
 	GLUNIFORM_COUNT,
 };
 
@@ -93,8 +98,16 @@ enum gluniform_type
 enum myattr
 {
 	ATTR_COUNT,
-	ATTR_STRIDE,
 	ATTR_POINTCLOUD,
+	ATTR_POINTCLOUD_POS,
+	ATTR_POINTCLOUD_COL,
+	ATTR_MESH,
+	ATTR_SET_INSTANCEOF,
+	ATTR_TEXTURE,
+	ATTR_SCALE,
+	ATTR_QUATERNION,
+	ATTR_POSITION,
+	ATTR_RECTANGLE,
 };
 
 struct mynet_eav
@@ -111,37 +124,40 @@ struct mynet_eav_u32
 	uint32_t value;
 };
 
-
-
-static void receiver (ecs_world_t * world, ecs_entity_t const e[], void * ptr)
+struct mynet_eav_component_texture
 {
-	struct mynet_eav * eav = ptr;
-	switch (eav->attribute)
-	{
-	case ATTR_COUNT:{
-		struct mynet_eav_u32 * eav32 = ptr;
-		ecs_set (world, e[eav->entity], component_count, {eav32->value});
-		break;}
-	case ATTR_STRIDE:{
-		struct mynet_eav_u32 * eav32 = ptr;
-		ecs_set (world, e[eav->entity], component_stride, {eav32->value});
-		break;}
-	case ATTR_POINTCLOUD:
-		ecs_add (world, e[eav->entity], component_pointcloud);
-		break;
-	}
-}
+	uint32_t entity;
+	uint32_t attribute;
+	component_texture value;
+};
 
-
-void mynet_test (ecs_world_t * world)
+struct mynet_eav_component_rectangle
 {
-	ecs_entity_t const * e = ecs_bulk_new (world, 0, 4);
+	uint32_t entity;
+	uint32_t attribute;
+	component_rectangle value;
+};
 
+struct mynet_eav_component_scale
+{
+	uint32_t entity;
+	uint32_t attribute;
+	component_scale value;
+};
 
-	receiver(world, e, &(struct mynet_eav){0, ATTR_POINTCLOUD});
-	receiver(world, e, &(struct mynet_eav_u32){0, ATTR_COUNT, 10000});
+struct mynet_eav_component_quaternion
+{
+	uint32_t entity;
+	uint32_t attribute;
+	component_quaternion value;
+};
 
-}
+struct mynet_eav_component_position
+{
+	uint32_t entity;
+	uint32_t attribute;
+	component_position value;
+};
 
 
 

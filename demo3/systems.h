@@ -11,12 +11,12 @@
 
 #include "components.h"
 
-
+#define NETENTS_MAX 1000
 
 static GLint global_glprogram[GLPROGRAM_COUNT];
 static GLint global_gluniform[GLUNIFORM_COUNT];
 static struct csc_gcam global_gcam;
-
+static ecs_entity_t global_netents[NETENTS_MAX];
 
 
 
@@ -182,8 +182,8 @@ static void system_pointcloud_draw (ecs_iter_t *it)
 	for (int32_t i = 0; i < it->count; ++i)
 	{
 		glBindVertexArray (pc[i].vao);
-		glUseProgram (global_glprogram[GLPROGRAM_POINTS]);
-		glUniformMatrix4fv (global_gluniform[GLUNIFORM_POINTS_MVP], 1, GL_FALSE, (const GLfloat *) global_gcam.mvp);
+		glUseProgram (global_glprogram[GLPROGRAM_POINT]);
+		glUniformMatrix4fv (global_gluniform[GLUNIFORM_POINT_MVP], 1, GL_FALSE, (const GLfloat *) global_gcam.mvp);
 		glDrawArrays (GL_POINTS, 0, c[i]);
 	}
 }
@@ -199,6 +199,8 @@ static void system_mesh_set_rectangle (ecs_iter_t *it)
 	{
 		ASSERT (count[i] == 6);
 
+
+		printf ("system_mesh_set_rectangle %i:%i\n", img[i].vbop, count[i]);
 		glBindBuffer (GL_ARRAY_BUFFER, img[i].vbop);
 		glBufferData (GL_ARRAY_BUFFER, count[i] * sizeof (component_position), NULL, GL_DYNAMIC_DRAW);
 		component_position p[6];
@@ -206,6 +208,7 @@ static void system_mesh_set_rectangle (ecs_iter_t *it)
 		glBufferSubData (GL_ARRAY_BUFFER, 0, 6 * sizeof (component_position), p);
 
 
+		printf ("system_mesh_set_rectangle %i:%i\n", img[i].vbot, count[i]);
 		glBindBuffer (GL_ARRAY_BUFFER, img[i].vbot);
 		glBufferData (GL_ARRAY_BUFFER, count[i] * sizeof (component_uv), NULL, GL_DYNAMIC_DRAW);
 		component_uv uv[6];
@@ -225,12 +228,18 @@ static void system_mesh_set (ecs_iter_t *it)
 	{
 		glBindVertexArray (vao[i]);
 
-		glBindBuffer (GL_ARRAY_BUFFER, mesh[i].vbop);
-		glVertexAttribPointer (0, 4, GL_FLOAT, GL_FALSE, 0, (void*)(intptr_t)0);
+		ASSERT (glIsBuffer(mesh[i].vbop) == GL_TRUE);
+		ASSERT (glIsBuffer(mesh[i].vbot) == GL_TRUE);
+
 		glEnableVertexAttribArray (0);
+		glEnableVertexAttribArray (1);
+
+		glBindBuffer (GL_ARRAY_BUFFER, mesh[i].vbop);
+		glBufferData (GL_ARRAY_BUFFER, count[i] * sizeof (component_position), NULL, GL_DYNAMIC_DRAW);
+		glVertexAttribPointer (0, 4, GL_FLOAT, GL_FALSE, 0, (void*)(intptr_t)0);
 
 		glBindBuffer (GL_ARRAY_BUFFER, mesh[i].vbot);
-		glEnableVertexAttribArray (1);
+		glBufferData (GL_ARRAY_BUFFER, count[i] * sizeof (component_uv), NULL, GL_DYNAMIC_DRAW);
 		glVertexAttribPointer (1, 2, GL_FLOAT, GL_FALSE, 0, (void*)(intptr_t)0);
 	}
 }
@@ -248,8 +257,9 @@ static void system_mesh_draw (ecs_iter_t *it)
 	glActiveTexture (GL_TEXTURE0);
 	glBindTexture (GL_TEXTURE_2D_ARRAY, tbo[0]);
 	glBindVertexArray (vao[0]);
-	glUseProgram (global_glprogram[GLPROGRAM_IMGS]);
-	glUniform1i (global_gluniform[GLUNIFORM_IMGS_TEX0], 0);
+	glUseProgram (global_glprogram[GLPROGRAM_MESH]);
+	glUniform1i (global_gluniform[GLUNIFORM_MESH_TEX0], 0);
+
 	for (int32_t i = 0; i < it->count; ++i)
 	{
 		float m[4*4];
@@ -268,7 +278,7 @@ static void system_mesh_draw (ecs_iter_t *it)
 		m4f32_mul (m, mt, m); //Apply translation
 		//m4f32_print (mt, stdout);
 		m4f32_mul (m, global_gcam.mvp, m);
-		glUniformMatrix4fv (global_gluniform[GLUNIFORM_IMGS_MVP], 1, GL_FALSE, (const GLfloat *) m);
+		glUniformMatrix4fv (global_gluniform[GLUNIFORM_MESH_MVP], 1, GL_FALSE, (const GLfloat *) m);
 		glDrawArrays (GL_TRIANGLES, 0, count[0]);
 	}
 }
@@ -310,35 +320,145 @@ static void systems_init (ecs_world_t * world)
 	ECS_SYSTEM (world, system_pointcloud_set, EcsOnSet, component_pointcloud, component_count);
 	ECS_SYSTEM (world, system_pointcloud_draw, EcsOnUpdate, component_pointcloud, component_count);
 
-	global_glprogram[GLPROGRAM_TRIANGLES] = csc_gl_program_from_files1 (CSC_SRCDIR"shader_pointcloud.glvs;"CSC_SRCDIR"shader_pointcloud.glfs");
-	global_glprogram[GLPROGRAM_POINTS] = csc_gl_program_from_files1 (CSC_SRCDIR"shader_pointcloud.glvs;"CSC_SRCDIR"shader_pointcloud.glfs");
-	global_glprogram[GLPROGRAM_IMGS] = csc_gl_program_from_files1 (CSC_SRCDIR"shader_image.glvs;"CSC_SRCDIR"shader_image.glfs");
-	glLinkProgram (global_glprogram[GLPROGRAM_TRIANGLES]);
-	glLinkProgram (global_glprogram[GLPROGRAM_POINTS]);
-	glLinkProgram (global_glprogram[GLPROGRAM_IMGS]);
+	global_glprogram[GLPROGRAM_POINT] = csc_gl_program_from_files1 (CSC_SRCDIR"shader_pointcloud.glvs;"CSC_SRCDIR"shader_pointcloud.glfs");
+	global_glprogram[GLPROGRAM_MESH] = csc_gl_program_from_files1 (CSC_SRCDIR"shader_image.glvs;"CSC_SRCDIR"shader_image.glfs");
+	glLinkProgram (global_glprogram[GLPROGRAM_POINT]);
+	glLinkProgram (global_glprogram[GLPROGRAM_MESH]);
 
-	global_gluniform[GLUNIFORM_TRIANGLES_MVP] = glGetUniformLocation (global_glprogram[GLPROGRAM_TRIANGLES], "mvp");
-	global_gluniform[GLUNIFORM_POINTS_MVP] = glGetUniformLocation (global_glprogram[GLPROGRAM_POINTS], "mvp");
-	global_gluniform[GLUNIFORM_IMGS_MVP] = glGetUniformLocation (global_glprogram[GLPROGRAM_IMGS], "mvp");
-	global_gluniform[GLUNIFORM_IMGS_TEX0] = glGetUniformLocation (global_glprogram[GLPROGRAM_IMGS], "tex0");
+	global_gluniform[GLUNIFORM_POINT_MVP] = glGetUniformLocation (global_glprogram[GLPROGRAM_POINT], "mvp");
+	global_gluniform[GLUNIFORM_MESH_MVP] = glGetUniformLocation (global_glprogram[GLPROGRAM_MESH], "mvp");
+	global_gluniform[GLUNIFORM_MESH_TEX0] = glGetUniformLocation (global_glprogram[GLPROGRAM_MESH], "tex0");
 
 
 
 	csc_gcam_init (&global_gcam);
 	v4f32_set_xyzw (global_gcam.p, 0.0f, 0.0f, -1.0f, 1.0f);
 
-
-	int nrAttributes;
-	glGetIntegerv(GL_MAX_VERTEX_ATTRIBS, &nrAttributes);
-	printf ("GL_MAX_VERTEX_ATTRIBS %i\n", nrAttributes);
-
+	ecs_entity_t const * e = ecs_bulk_new (world, 0, NETENTS_MAX);
+	memcpy (global_netents, e, sizeof (ecs_entity_t) * NETENTS_MAX);
+}
 
 
-	mynet_test (world);
+
+static void receiver (ecs_world_t * world, ecs_entity_t const e[], void * ptr, uint32_t value_size)
+{
+	struct mynet_eav * eav = ptr;
+	switch (eav->attribute)
+	{
+	case ATTR_COUNT:{
+		struct mynet_eav_u32 * eav32 = ptr;
+		ecs_set (world, e[eav->entity], component_count, {eav32->value});
+		break;}
+	case ATTR_POINTCLOUD:
+		ecs_add (world, e[eav->entity], component_pointcloud);
+		break;
+	case ATTR_POINTCLOUD_POS:{
+		component_pointcloud const * cloud = ecs_get (world, e[eav->entity], component_pointcloud);
+		component_count const * c = ecs_get (world, e[eav->entity], component_count);
+		uint32_t value_count = value_size / sizeof (component_position);
+		ASSERT (value_count <= *c);
+		glBindBuffer (GL_ARRAY_BUFFER, cloud->vbop);
+		component_position * pos = (void*)eav->value;
+		glBufferSubData (GL_ARRAY_BUFFER, 0, value_size, pos);
+		break;}
+	case ATTR_POINTCLOUD_COL:{
+		component_pointcloud const * cloud = ecs_get (world, e[eav->entity], component_pointcloud);
+		component_count const * c = ecs_get (world, e[eav->entity], component_count);
+		uint32_t value_count = value_size / sizeof (component_color);
+		ASSERT (value_count <= *c);
+		glBindBuffer (GL_ARRAY_BUFFER, cloud->vboc);
+		component_color * color = (void*)eav->value;
+		glBufferSubData (GL_ARRAY_BUFFER, 0, value_size, color);
+		break;}
+	case ATTR_MESH:
+		ecs_add (world, e[eav->entity], component_mesh);
+		ecs_add (world, e[eav->entity], component_vao);
+		break;
+	case ATTR_TEXTURE:{
+		struct mynet_eav_component_texture * tex = ptr;
+		ecs_add (world, e[tex->entity], component_tbo);
+		ecs_set_ptr (world, e[tex->entity], component_texture, &tex->value);
+		break;}
+	case ATTR_POSITION:{
+		struct mynet_eav_component_position * pos = ptr;
+		ecs_set_ptr (world, e[pos->entity], component_position, &pos->value);
+		break;}
+	case ATTR_SCALE:{
+		struct mynet_eav_component_scale * scale = ptr;
+		ecs_set_ptr (world, e[scale->entity], component_scale, &scale->value);
+		break;}
+	case ATTR_QUATERNION:{
+		struct mynet_eav_component_quaternion * q = ptr;
+		ecs_set_ptr (world, e[q->entity], component_quaternion, &q->value);
+		break;}
+	case ATTR_SET_INSTANCEOF:{
+		struct mynet_eav_u32 * a = ptr;
+		ecs_add_entity (world, e[a->entity], ECS_INSTANCEOF | e[a->value]);
+		break;}
+	case ATTR_RECTANGLE:{
+		struct mynet_eav_component_rectangle * a = ptr;
+		ecs_set_ptr (world, e[a->entity], component_rectangle, &a->value);
+		break;}
+	}
 
 }
 
 
+
+
+static void mynet_test (ecs_world_t * world)
+{
+	enum myent
+	{
+		MYENT_CLOUD,
+		MYENT_MESH_RECTANGLE,
+		MYENT_TEXTURE,
+
+		MYENT_DRAW_IMG1,
+		MYENT_DRAW_IMG2,
+	};
+
+
+	receiver (world, global_netents, &(struct mynet_eav){MYENT_CLOUD, ATTR_POINTCLOUD}, 0);
+	receiver (world, global_netents, &(struct mynet_eav_u32){MYENT_CLOUD, ATTR_COUNT, 100}, 0);
+
+	{
+		printf ("sizeof (struct mynet_eav): %i\n", sizeof (struct mynet_eav));
+		uint32_t size = 100 * sizeof (component_position);
+		struct mynet_eav * pc = malloc (sizeof (struct mynet_eav) + size);
+		pc->entity = MYENT_CLOUD;
+		pc->attribute = ATTR_POINTCLOUD_POS;
+		component_position * p = (void*)pc->value;
+		for (uint32_t i = 0; i < 100; ++i)
+		{
+			p[i][0] = (float)i / 20.0f;
+			p[i][1] = (float)i / 40.0f;
+			p[i][2] = (float)i / 80.0f;
+			p[i][3] = 10.0f;
+		}
+		receiver (world, global_netents, pc, size);
+	}
+
+
+	receiver (world, global_netents, &(struct mynet_eav_component_texture){MYENT_TEXTURE, ATTR_TEXTURE, {0, 100, 100, 1}}, 0);
+
+	receiver (world, global_netents, &(struct mynet_eav){MYENT_MESH_RECTANGLE, ATTR_MESH}, 0);
+	receiver (world, global_netents, &(struct mynet_eav_u32){MYENT_MESH_RECTANGLE, ATTR_COUNT, 6}, 0);
+	receiver (world, global_netents, &(struct mynet_eav_component_rectangle){MYENT_MESH_RECTANGLE, ATTR_RECTANGLE, {1.0f, 1.0f}}, 0);
+
+	receiver (world, global_netents, &(struct mynet_eav_component_position){MYENT_DRAW_IMG1, ATTR_POSITION, {3.0f, 1.0f, 0.0f, 1.0f}}, 0);
+	receiver (world, global_netents, &(struct mynet_eav_component_position){MYENT_DRAW_IMG1, ATTR_SCALE, {0.2f, 0.3f, 0.0f, 1.0f}}, 0);
+	receiver (world, global_netents, &(struct mynet_eav_component_position){MYENT_DRAW_IMG1, ATTR_QUATERNION, {0.0f, 0.0f, 0.0f, 1.0f}}, 0);
+	receiver (world, global_netents, &(struct mynet_eav_u32){MYENT_DRAW_IMG1, ATTR_SET_INSTANCEOF, MYENT_MESH_RECTANGLE}, 0);
+	receiver (world, global_netents, &(struct mynet_eav_u32){MYENT_DRAW_IMG1, ATTR_SET_INSTANCEOF, MYENT_TEXTURE}, 0);
+
+	receiver (world, global_netents, &(struct mynet_eav_component_position){MYENT_DRAW_IMG2, ATTR_POSITION, {0.0f, 0.0f, 0.0f, 1.0f}}, 0);
+	receiver (world, global_netents, &(struct mynet_eav_component_position){MYENT_DRAW_IMG2, ATTR_SCALE, {0.1f, 0.1f, 0.0f, 1.0f}}, 0);
+	receiver (world, global_netents, &(struct mynet_eav_component_position){MYENT_DRAW_IMG2, ATTR_QUATERNION, {0.0f, 0.0f, 0.0f, 1.0f}}, 0);
+	receiver (world, global_netents, &(struct mynet_eav_u32){MYENT_DRAW_IMG2, ATTR_SET_INSTANCEOF, MYENT_MESH_RECTANGLE}, 0);
+	receiver (world, global_netents, &(struct mynet_eav_u32){MYENT_DRAW_IMG2, ATTR_SET_INSTANCEOF, MYENT_TEXTURE}, 0);
+
+}
 
 
 

@@ -93,7 +93,9 @@ int main (int argc, char * argv[])
 
 	ecs_world_t * world = ecs_init();
 	systems_init (world);
-	addents (world);
+	//addents (world);
+	mynet_test (world);
+
 	//ecs_entity_t e3 = e2[0];
 	const uint8_t * keyboard = SDL_GetKeyboardState (NULL);
 	ecs_singleton_set (world, component_controller, {keyboard});
