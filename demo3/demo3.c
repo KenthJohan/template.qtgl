@@ -20,6 +20,7 @@
 
 #include "components.h"
 #include "systems.h"
+#include "eavnet.h"
 
 
 #define WIN_X SDL_WINDOWPOS_UNDEFINED

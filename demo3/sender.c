@@ -2,7 +2,7 @@
 #include "csc/csc_basic.h"
 #include "csc/csc_debug.h"
 #include "csc/csc_math.h"
-#include "csc/experiment/netgl.h"
+#include "components.h"
 
 #include <SDL2/SDL_net.h>
 #include <stdio.h>

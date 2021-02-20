@@ -12,6 +12,7 @@ HEADERS += csc/csc_v3f32.h
 HEADERS += csc/csc_v4f32.h
 HEADERS += components.h
 HEADERS += systems.h
+HEADERS += eavnet.h
 
 
 QMAKE_CFLAGS += -Wno-unused-function
