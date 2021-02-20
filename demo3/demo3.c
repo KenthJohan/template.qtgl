@@ -95,7 +95,9 @@ int main (int argc, char * argv[])
 	ecs_world_t * world = ecs_init();
 	systems_init (world);
 	//addents (world);
-	mynet_test (world);
+	struct eavnet_context eavcontext;
+	eavnet_context_init (&eavcontext, world);
+	eavnet_test (world, eavcontext.entities);
 
 	//ecs_entity_t e3 = e2[0];
 	const uint8_t * keyboard = SDL_GetKeyboardState (NULL);
