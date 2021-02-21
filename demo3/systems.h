@@ -2,7 +2,6 @@
 
 #include <flecs.h>
 #include <GL/glew.h>
-#include <SDL2/SDL_net.h>
 
 #include "csc/csc_math.h"
 #include "csc/csc_gl.h"
@@ -281,6 +280,7 @@ static void system_mesh_draw (ecs_iter_t *it)
 		glDrawArrays (GL_TRIANGLES, 0, count[0]);
 	}
 }
+
 
 
 static void systems_init (ecs_world_t * world)

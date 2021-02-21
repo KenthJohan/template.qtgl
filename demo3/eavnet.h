@@ -1,182 +1,164 @@
 #pragma once
 
 #include <flecs.h>
-#include <GL/glew.h>
-#include <SDL2/SDL_net.h>
 
 #include "csc/csc_math.h"
 #include "csc/csc_gl.h"
 #include "csc/csc_gcam.h"
 #include "csc/csc_qf32.h"
+#include "csc/csc_debug_nng.h"
 
+#include <nng/nng.h>
+#include <nng/protocol/pair0/pair.h>
+#include <nng/protocol/pair1/pair.h>
+#include <nng/supplemental/util/platform.h>
 
 #include "components.h"
 
 #define EAVNET_ENTITY_MAX 1000
+#define EAVNET_SEND(sock, type, data) SDLNet_TCP_Send ((sock), &(type)data, sizeof((type)data));
+
+
 
 struct eavnet_context
 {
+	ecs_world_t * world;
 	ecs_entity_t entities[EAVNET_ENTITY_MAX];
+	nng_socket sock;
 };
 
-static void eavnet_context_init (struct eavnet_context * ctx, ecs_world_t * world)
+
+static void eavnet_context_init (struct eavnet_context * ctx, char const * address)
 {
-	ecs_entity_t const * e = ecs_bulk_new (world, 0, EAVNET_ENTITY_MAX);
+	ecs_entity_t const * e = ecs_bulk_new (ctx->world, 0, EAVNET_ENTITY_MAX);
 	memcpy (ctx->entities, e, sizeof (ecs_entity_t) * EAVNET_ENTITY_MAX);
+	int r;
+	r = nng_pair0_open (&ctx->sock);
+	NNG_EXIT_ON_ERROR (r);
+	r = nng_listen (ctx->sock, address, NULL, 0);
+	NNG_EXIT_ON_ERROR (r);
 }
 
 
-static void eavnet_receiver (ecs_world_t * world, ecs_entity_t const e[], void * ptr, uint32_t value_size)
+static void eavnet_receiver (struct eavnet_context * ctx, uint32_t entity, uint32_t attribute, void * ptr, uint32_t value_size)
 {
-	struct mynet_eav * eav = ptr;
-	switch (eav->attribute)
+	ecs_world_t * world = ctx->world;
+	ecs_entity_t e = ctx->entities[entity];
+	switch (attribute)
 	{
 	case ATTR_COUNT:{
-		struct mynet_eav_u32 * eav32 = ptr;
-		ecs_set (world, e[eav->entity], component_count, {eav32->value});
+		uint32_t * a = ptr;
+		ecs_set (world, e, component_count, {*a});
 		break;}
 	case ATTR_POINTCLOUD:
-		ecs_add (world, e[eav->entity], component_pointcloud);
+		ecs_add (world, e, component_pointcloud);
 		break;
 	case ATTR_POINTCLOUD_POS:{
-		component_pointcloud const * cloud = ecs_get (world, e[eav->entity], component_pointcloud);
-		component_count const * c = ecs_get (world, e[eav->entity], component_count);
-		uint32_t value_count = value_size / sizeof (component_position);
-		ASSERT (value_count <= *c);
+		component_pointcloud const * cloud = ecs_get (world, e, component_pointcloud);
+		component_count const * count = ecs_get (world, e, component_count);
+		uint32_t size = (*count) * sizeof (component_position);
 		glBindBuffer (GL_ARRAY_BUFFER, cloud->vbop);
-		component_position * pos = (void*)eav->value;
-		glBufferSubData (GL_ARRAY_BUFFER, 0, value_size, pos);
+		component_position * p = ptr;
+		for (int i = 0; i < 1; ++i)
+		{
+			p[i][0] = 0.0f;
+			p[i][1] = 0.0f;
+			p[i][2] = 0.0f;
+			p[i][3] = 40.0f;
+		}
+		glBufferSubData (GL_ARRAY_BUFFER, 0, MIN(value_size, size), p);
 		break;}
 	case ATTR_POINTCLOUD_COL:{
-		component_pointcloud const * cloud = ecs_get (world, e[eav->entity], component_pointcloud);
-		component_count const * c = ecs_get (world, e[eav->entity], component_count);
-		uint32_t value_count = value_size / sizeof (component_color);
-		ASSERT (value_count <= *c);
+		component_pointcloud const * cloud = ecs_get (world, e, component_pointcloud);
+		component_count const * count = ecs_get (world, e, component_count);
+		uint32_t size = (*count) * sizeof (component_color);
 		glBindBuffer (GL_ARRAY_BUFFER, cloud->vboc);
-		component_color * color = (void*)eav->value;
-		glBufferSubData (GL_ARRAY_BUFFER, 0, value_size, color);
+		glBufferSubData (GL_ARRAY_BUFFER, 0, MIN(value_size, size), ptr);
 		break;}
 	case ATTR_MESH:
-		ecs_add (world, e[eav->entity], component_mesh);
-		ecs_add (world, e[eav->entity], component_vao);
+		ecs_add (world, e, component_mesh);
+		ecs_add (world, e, component_vao);
 		break;
 	case ATTR_TEXTURE:{
-		struct mynet_eav_component_texture * tex = ptr;
-		ecs_add (world, e[tex->entity], component_tbo);
-		ecs_set_ptr (world, e[tex->entity], component_texture, &tex->value);
+		ecs_add (world, e, component_tbo);
+		ecs_set_ptr (world, e, component_texture, ptr);
 		break;}
 	case ATTR_POSITION:{
-		struct mynet_eav_component_position * pos = ptr;
-		ecs_set_ptr (world, e[pos->entity], component_position, &pos->value);
+		ecs_set_ptr (world, e, component_position, ptr);
 		break;}
 	case ATTR_SCALE:{
-		struct mynet_eav_component_scale * scale = ptr;
-		ecs_set_ptr (world, e[scale->entity], component_scale, &scale->value);
+		ecs_set_ptr (world, e, component_scale, ptr);
 		break;}
 	case ATTR_QUATERNION:{
-		struct mynet_eav_component_quaternion * q = ptr;
-		ecs_set_ptr (world, e[q->entity], component_quaternion, &q->value);
+		ecs_set_ptr (world, e, component_quaternion, ptr);
 		break;}
 	case ATTR_ADD_INSTANCEOF:{
-		struct mynet_eav_u32 * a = ptr;
-		ecs_add_entity (world, e[a->entity], ECS_INSTANCEOF | e[a->value]);
+		uint32_t * a = ptr;
+		ecs_add_entity (world, e, ECS_INSTANCEOF | ctx->entities[*a]);
 		break;}
 	case ATTR_RECTANGLE:{
-		struct mynet_eav_component_rectangle * a = ptr;
-		ecs_set_ptr (world, e[a->entity], component_rectangle, &a->value);
+		ecs_set_ptr (world, e, component_rectangle, ptr);
 		break;}
 	}
 
 }
 
 
-
-static int eavnet_send_u32 (TCPsocket client, uint32_t entity, uint32_t attribute, uint32_t value)
+static void eavnet_receiver1 (struct eavnet_context * ctx)
 {
-	struct mynet_eav_u32 msg = {entity, attribute, value};
-	int result = SDLNet_TCP_Send (client, &msg, sizeof (msg));
-	return result;
-}
-
-
-static int eavnet_send_ptr (TCPsocket client, uint32_t entity, uint32_t attribute, void * value, uint32_t size)
-{
-	struct
+	nng_msg *msg;
+	int rv = nng_recvmsg (ctx->sock, &msg, NNG_FLAG_NONBLOCK | NNG_FLAG_ALLOC);
+	if (rv == NNG_EAGAIN)
 	{
-		uint32_t entity;
-		uint32_t attribute;
-		uint8_t value[100];
-	} msg;
-	msg.entity = entity;
-	msg.attribute = attribute;
-	memcpy (msg.value, value, size);
-	int result = SDLNet_TCP_Send (client, &msg, sizeof (struct mynet_eav) + size);
-	return result;
-}
-
-
-static void eavnet_test (struct ecs_world_t * world, ecs_entity_t entities[])
-{
-
-	enum myent
-	{
-		MYENT_MESH_RECTANGLE,
-		MYENT_TEXTURE1,
-		MYENT_TEXTURE2,
-
-		MYENT_DRAW_CLOUD,
-		MYENT_DRAW_IMG1,
-		MYENT_DRAW_IMG2,
-	};
-
-
-
-
-	{
-		uint32_t count = 1000;
-		eavnet_receiver (world, entities, &(struct mynet_eav){MYENT_DRAW_CLOUD, ATTR_POINTCLOUD}, 0);
-		eavnet_receiver (world, entities, &(struct mynet_eav_u32){MYENT_DRAW_CLOUD, ATTR_COUNT, count}, 0);
-		printf ("sizeof (struct mynet_eav): %i\n", sizeof (struct mynet_eav));
-		uint32_t size = count * sizeof (component_position);
-		struct mynet_eav * pc = malloc (sizeof (struct mynet_eav) + size);
-		pc->entity = MYENT_DRAW_CLOUD;
-		pc->attribute = ATTR_POINTCLOUD_POS;
-		component_position * p = (void*)pc->value;
-		for (uint32_t i = 0; i < count; ++i)
-		{
-			p[i][0] = 10.0f * (float)i / rand();
-			p[i][1] = 1.0f * (float)i / rand();
-			p[i][2] = 10.0f * (float)i / rand();
-			p[i][3] = 100.0f;
-		}
-		eavnet_receiver (world, entities, pc, size);
+		return;
 	}
-
-
-	eavnet_receiver (world, entities, &(struct mynet_eav_component_texture){MYENT_TEXTURE1, ATTR_TEXTURE, {0, 100, 100, 1}}, 0);
-	eavnet_receiver (world, entities, &(struct mynet_eav_component_texture){MYENT_TEXTURE2, ATTR_TEXTURE, {0, 300, 300, 1}}, 0);
-
-	eavnet_receiver (world, entities, &(struct mynet_eav){MYENT_MESH_RECTANGLE, ATTR_MESH}, 0);
-	eavnet_receiver (world, entities, &(struct mynet_eav_u32){MYENT_MESH_RECTANGLE, ATTR_COUNT, 6}, 0);
-	eavnet_receiver (world, entities, &(struct mynet_eav_component_rectangle){MYENT_MESH_RECTANGLE, ATTR_RECTANGLE, {1.0f, 1.0f}}, 0);
-
-	eavnet_receiver (world, entities, &(struct mynet_eav_component_position){MYENT_DRAW_IMG1, ATTR_POSITION, {3.0f, 1.0f, 0.0f, 1.0f}}, 0);
-	eavnet_receiver (world, entities, &(struct mynet_eav_component_position){MYENT_DRAW_IMG1, ATTR_SCALE, {0.3f, 0.3f, 0.0f, 1.0f}}, 0);
-	eavnet_receiver (world, entities, &(struct mynet_eav_component_position){MYENT_DRAW_IMG1, ATTR_QUATERNION, {0.0f, 0.0f, 0.0f, 1.0f}}, 0);
-	eavnet_receiver (world, entities, &(struct mynet_eav_u32){MYENT_DRAW_IMG1, ATTR_ADD_INSTANCEOF, MYENT_MESH_RECTANGLE}, 0);
-	eavnet_receiver (world, entities, &(struct mynet_eav_u32){MYENT_DRAW_IMG1, ATTR_ADD_INSTANCEOF, MYENT_TEXTURE1}, 0);
-
-	eavnet_receiver (world, entities, &(struct mynet_eav_component_position){MYENT_DRAW_IMG2, ATTR_POSITION, {4.0f, 1.0f, 0.0f, 1.0f}}, 0);
-	eavnet_receiver (world, entities, &(struct mynet_eav_component_position){MYENT_DRAW_IMG2, ATTR_SCALE, {0.3f, 0.3f, 0.0f, 1.0f}}, 0);
-	eavnet_receiver (world, entities, &(struct mynet_eav_component_position){MYENT_DRAW_IMG2, ATTR_QUATERNION, {0.0f, 0.0f, 0.0f, 1.0f}}, 0);
-	eavnet_receiver (world, entities, &(struct mynet_eav_u32){MYENT_DRAW_IMG2, ATTR_ADD_INSTANCEOF, MYENT_MESH_RECTANGLE}, 0);
-	eavnet_receiver (world, entities, &(struct mynet_eav_u32){MYENT_DRAW_IMG2, ATTR_ADD_INSTANCEOF, MYENT_TEXTURE2}, 0);
-
-
-	//mynet_send_ptr(NULL, 0, 0, &(component_position){1.0f, 2.0f, 3.0f, 1.0f}, sizeof (component_position));
-
+	else if (rv != 0)
+	{
+		NNG_EXIT_ON_ERROR (rv);
+	}
+	uint32_t entity;
+	uint32_t attribute;
+	nng_msg_trim_u32 (msg, &entity);
+	nng_msg_trim_u32 (msg, &attribute);
+	//printf ("nng_msg_len %i\n", nng_msg_len (msg));
+	//float * body = nng_msg_body (msg);
+	eavnet_receiver (ctx, entity, attribute, nng_msg_body (msg), nng_msg_len (msg));
+	nng_msg_free (msg);
 }
 
+
+/*
+static int eavnet_thread_recv (void * ptr)
+{
+	printf ("mythead started\n");
+	struct eavnet_context * ctx = ptr;
+	while (1)
+	{
+		size_t sz;
+		void * buffer = NULL;
+		printf ("mythead nng_recv\n");
+		int rv = nng_recv (ctx->sock, &buffer, &sz, NNG_FLAG_ALLOC);
+		if (rv == NNG_EAGAIN)
+		{
+			printf ("NNG_EAGAIN\n");
+			continue;
+		}
+		else if (rv != 0)
+		{
+			NNG_EXIT_ON_ERROR (rv);
+		}
+		printf ("mythead sz: %lli\n", sz);
+		if (sz >= sizeof (struct mynet_eav))
+		{
+			//eavnet_receiver (ctx, buffer, sz - sizeof (struct mynet_eav));
+		}
+		nng_free (buffer, sz);
+
+		SDL_Delay (1000);
+	}
+	return 0;
+}
+*/
 
 
 

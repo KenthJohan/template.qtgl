@@ -13,7 +13,6 @@
 #include <flecs.h>
 #include <posix_set_os_api.h>
 #include <SDL2/SDL.h>
-#include <SDL2/SDL_net.h>
 #include <GL/glew.h>
 #include <stdio.h>
 
@@ -69,6 +68,66 @@ static void addents (ecs_world_t * world)
 }
 
 
+static void eavnet_test (struct eavnet_context * ctx)
+{
+
+	enum myent
+	{
+		MYENT_MESH_RECTANGLE,
+		MYENT_TEXTURE1,
+		MYENT_TEXTURE2,
+
+		MYENT_DRAW_CLOUD,
+		MYENT_DRAW_IMG1,
+		MYENT_DRAW_IMG2,
+	};
+
+	{
+		uint32_t count = 1000;
+		eavnet_receiver (ctx, MYENT_DRAW_CLOUD, ATTR_POINTCLOUD, NULL, 0);
+		eavnet_receiver (ctx, MYENT_DRAW_CLOUD, ATTR_COUNT, &(component_count){count}, 0);
+		printf ("sizeof (struct mynet_eav): %i\n", (int)sizeof (struct mynet_eav));
+		uint32_t size = count * sizeof (component_position);
+		struct mynet_eav * pc = malloc (sizeof (struct mynet_eav) + size);
+		pc->entity = MYENT_DRAW_CLOUD;
+		pc->attribute = ATTR_POINTCLOUD_POS;
+		component_position * p = (void*)pc->value;
+		for (uint32_t i = 0; i < count; ++i)
+		{
+			p[i][0] = 10.0f * (float)i / rand();
+			p[i][1] = 1.0f * (float)i / rand();
+			p[i][2] = 10.0f * (float)i / rand();
+			p[i][3] = 100.0f;
+		}
+		//eavnet_receiver (ctx, pc, size);
+		free (pc);
+	}
+
+	eavnet_receiver (ctx, MYENT_TEXTURE1, ATTR_TEXTURE, &(component_texture){0, 100, 100, 1}, 0);
+	eavnet_receiver (ctx, MYENT_TEXTURE2, ATTR_TEXTURE, &(component_texture){0, 300, 300, 1}, 0);
+	eavnet_receiver (ctx, MYENT_MESH_RECTANGLE, ATTR_MESH, NULL, 0);
+	eavnet_receiver (ctx, MYENT_MESH_RECTANGLE, ATTR_COUNT, &(component_count){6}, 0);
+	eavnet_receiver (ctx, MYENT_MESH_RECTANGLE, ATTR_RECTANGLE, &(component_rectangle){1.0f, 1.0f}, 0);
+	eavnet_receiver (ctx, MYENT_DRAW_IMG1, ATTR_POSITION,&(component_position){3.0f, 1.0f, 0.0f, 1.0f}, 0);
+	eavnet_receiver (ctx, MYENT_DRAW_IMG1, ATTR_SCALE, &(component_position){0.3f, 0.3f, 0.0f, 1.0f}, 0);
+	eavnet_receiver (ctx, MYENT_DRAW_IMG1, ATTR_QUATERNION, &(component_position){0.0f, 0.0f, 0.0f, 1.0f}, 0);
+	eavnet_receiver (ctx, MYENT_DRAW_IMG1, ATTR_ADD_INSTANCEOF, &(uint32_t){MYENT_MESH_RECTANGLE}, 0);
+	eavnet_receiver (ctx, MYENT_DRAW_IMG1, ATTR_ADD_INSTANCEOF, &(uint32_t){MYENT_TEXTURE1}, 0);
+	eavnet_receiver (ctx, MYENT_DRAW_IMG2, ATTR_POSITION, &(component_position){4.0f, 1.0f, 0.0f, 1.0f}, 0);
+	eavnet_receiver (ctx, MYENT_DRAW_IMG2, ATTR_SCALE, &(component_position){0.3f, 0.3f, 0.0f, 1.0f}, 0);
+	eavnet_receiver (ctx, MYENT_DRAW_IMG2, ATTR_QUATERNION, &(component_position){0.0f, 0.0f, 0.0f, 1.0f}, 0);
+	eavnet_receiver (ctx, MYENT_DRAW_IMG2, ATTR_ADD_INSTANCEOF, &(uint32_t){MYENT_MESH_RECTANGLE}, 0);
+	eavnet_receiver (ctx, MYENT_DRAW_IMG2, ATTR_ADD_INSTANCEOF, &(uint32_t){MYENT_TEXTURE2}, 0);
+
+
+	//mynet_send_ptr(NULL, 0, 0, &(component_position){1.0f, 2.0f, 3.0f, 1.0f}, sizeof (component_position));
+
+}
+
+
+
+
+
 
 
 int main (int argc, char * argv[])
@@ -89,21 +148,21 @@ int main (int argc, char * argv[])
 	glEnable (GL_DEPTH_TEST);
 	//glBlendFunc (GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
 
-
-
-
 	ecs_world_t * world = ecs_init();
 	systems_init (world);
 	//addents (world);
-	struct eavnet_context eavcontext;
-	eavnet_context_init (&eavcontext, world);
-	eavnet_test (world, eavcontext.entities);
+	struct eavnet_context eavcontext = {0};
+	eavcontext.world = world;
+	eavnet_context_init (&eavcontext, "tcp://:9002");
+	eavnet_test (&eavcontext);
 
 	//ecs_entity_t e3 = e2[0];
 	const uint8_t * keyboard = SDL_GetKeyboardState (NULL);
 	ecs_singleton_set (world, component_controller, {keyboard});
 
 
+	//SDL_Thread * t = SDL_CreateThread (eavnet_thread_recv, "mythread", &eavcontext);
+	//ASSERT (t);
 
 
 	while (main_flags & CSC_SDLGLEW_RUNNING)
@@ -127,6 +186,7 @@ int main (int argc, char * argv[])
 		glClear (GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
 
+		eavnet_receiver1 (&eavcontext);
 
 		if (keyboard[SDL_SCANCODE_1])
 		{

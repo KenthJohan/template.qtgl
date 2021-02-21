@@ -35,6 +35,14 @@ SOURCES += ../flecs/flecs.c
 INCLUDEPATH += ../flecs
 INCLUDEPATH += ../flecs/flecs-os_api-posix/include
 
-LIBS += -lmingw32 -lSDL2main -lSDL2 -lopengl32 -lglew32 -lSDL2_net
 
-LIBS += -lws2_32 -lwsock32 -lpthread
+#LIBS += -lnng
+#LIBS += -lws2_32 -lwsock32 -lpthread
+
+LIBS += -lmingw32 -lSDL2main -lSDL2 -lopengl32 -lglew32
+
+
+DEFINES += NNG_STATIC_LIB
+LIBS += -Wl,-Bstatic
+LIBS += -lnng
+LIBS += -lws2_32 -lmswsock -ladvapi32 -lkernel32 -luser32 -lgdi32 -lwinspool -lshell32 -lole32 -loleaut32 -luuid -lcomdlg32 -ladvapi32
