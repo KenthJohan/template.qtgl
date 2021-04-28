@@ -118,10 +118,7 @@ static void eavnet_test (struct eavnet_context * ctx)
 	eavnet_receiver (ctx, MYENT_DRAW_IMG2, ATTR_QUATERNION, &(component_position){0.0f, 0.0f, 0.0f, 1.0f}, 0);
 	eavnet_receiver (ctx, MYENT_DRAW_IMG2, ATTR_ADD_INSTANCEOF, &(uint32_t){MYENT_MESH_RECTANGLE}, 0);
 	eavnet_receiver (ctx, MYENT_DRAW_IMG2, ATTR_ADD_INSTANCEOF, &(uint32_t){MYENT_TEXTURE2}, 0);
-
-
 	//mynet_send_ptr(NULL, 0, 0, &(component_position){1.0f, 2.0f, 3.0f, 1.0f}, sizeof (component_position));
-
 }
 
 
@@ -154,7 +151,7 @@ int main (int argc, char * argv[])
 	struct eavnet_context eavcontext = {0};
 	eavcontext.world = world;
 	eavnet_context_init (&eavcontext, "tcp://:9002");
-	eavnet_test (&eavcontext);
+	//eavnet_test (&eavcontext);
 
 	//ecs_entity_t e3 = e2[0];
 	const uint8_t * keyboard = SDL_GetKeyboardState (NULL);
